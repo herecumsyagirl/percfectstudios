@@ -2,43 +2,73 @@
 {% block title %}Buy Credits · PercfectAI{% endblock %}
 {% block content %}
 <div class="container py-5">
+
   <div class="text-center mb-5">
-    <h2 style="font-weight:700;letter-spacing:-0.02em;">Buy Credits</h2>
-    <p style="color:var(--text-muted)">Top up your image and video generation credits</p>
+    <div style="display:inline-block;background:rgba(124,110,247,0.1);border:1px solid rgba(124,110,247,0.3);border-radius:99px;padding:0.3rem 1rem;font-size:0.75rem;font-family:var(--font-mono);color:var(--accent-2);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:1.25rem;">
+      Credits
+    </div>
+    <h2 style="font-size:2.25rem;font-weight:700;letter-spacing:-0.03em;margin-bottom:0.5rem;">Top up your credits</h2>
+    <p style="color:var(--text-muted);font-size:1rem;max-width:400px;margin:0 auto;">One-time purchases. Credits never expire. Payments secured by Stripe.</p>
   </div>
 
-  <div class="row g-4 justify-content-center">
+  <div class="row g-4 justify-content-center" style="max-width:860px;margin:0 auto;">
 
     {% for key, pkg in packages.items() %}
     <div class="col-md-4">
-      <div class="card p-4 text-center {% if key == 'creator' %}featured-plan{% endif %}">
+      <div class="card p-4 h-100 text-center {% if key == 'creator' %}featured-plan{% endif %}" style="position:relative;">
+
         {% if key == 'creator' %}
-          <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);margin-bottom:0.75rem;">Most Popular</div>
+          <div style="position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:0.7rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:0.2rem 0.9rem;border-radius:99px;font-family:var(--font-mono);white-space:nowrap;">
+            Most Popular
+          </div>
         {% endif %}
 
-        <h5 class="mb-1" style="font-weight:700;">{{ pkg.name }}</h5>
-        <div style="font-size:2.25rem;font-weight:700;color:var(--accent-2);font-family:var(--font-mono);line-height:1.1;">
+        <div style="font-family:var(--font-mono);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.75rem;">{{ pkg.name }}</div>
+
+        <div style="font-size:3rem;font-weight:700;letter-spacing:-0.04em;line-height:1;margin-bottom:0.25rem;">
           ${{ (pkg.price / 100) | int }}
         </div>
-        <p style="color:var(--text-muted);font-size:0.875rem;margin:0.75rem 0 1.5rem;">
-          {{ pkg.image_credits }} image credits
-          {% if pkg.video_credits %} · {{ pkg.video_credits }} video credits{% endif %}
-        </p>
+        <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1.75rem;">one-time</div>
 
-        <form action="/create-checkout-session" method="POST">
+        <ul style="list-style:none;padding:0;margin:0 0 2rem;text-align:left;display:flex;flex-direction:column;gap:0.6rem;">
+          <li style="font-size:0.875rem;color:var(--text-muted);padding-left:1.25rem;position:relative;">
+            <span style="position:absolute;left:0;color:var(--accent);font-weight:700;">✓</span>
+            {{ pkg.image_credits }} image credits
+          </li>
+          {% if pkg.video_credits %}
+          <li style="font-size:0.875rem;color:var(--text-muted);padding-left:1.25rem;position:relative;">
+            <span style="position:absolute;left:0;color:var(--accent);font-weight:700;">✓</span>
+            {{ pkg.video_credits }} video credits
+          </li>
+          {% endif %}
+          <li style="font-size:0.875rem;color:var(--text-muted);padding-left:1.25rem;position:relative;">
+            <span style="position:absolute;left:0;color:var(--accent);font-weight:700;">✓</span>
+            Credits never expire
+          </li>
+          <li style="font-size:0.875rem;color:var(--text-muted);padding-left:1.25rem;position:relative;">
+            <span style="position:absolute;left:0;color:var(--accent);font-weight:700;">✓</span>
+            Download all outputs
+          </li>
+        </ul>
+
+        <form action="/create-checkout-session" method="POST" style="margin-top:auto;">
           <input type="hidden" name="package" value="{{ key }}" />
-          <button type="submit" class="btn btn-accent w-100 py-2">
-            Buy {{ pkg.name }}
+          <button type="submit" class="{% if key == 'creator' %}btn-accent{% else %}btn-outline-accent{% endif %} w-100 py-2" style="border-radius:10px;font-weight:600;border:{% if key != 'creator' %}1px solid var(--accent){% else %}none{% endif %};background:{% if key == 'creator' %}var(--accent){% else %}transparent{% endif %};color:{% if key == 'creator' %}#fff{% else %}var(--accent-2){% endif %};cursor:pointer;transition:all 0.2s;">
+            Get {{ pkg.name }}
           </button>
         </form>
+
       </div>
     </div>
     {% endfor %}
 
   </div>
 
-  <p class="text-center mt-4" style="font-size:0.8rem;color:var(--text-muted)">
-    Payments processed securely by Stripe · Credits never expire
-  </p>
+  <div class="text-center mt-5" style="display:flex;align-items:center;justify-content:center;gap:1.5rem;flex-wrap:wrap;">
+    <span style="font-size:0.8rem;color:var(--text-muted)">🔒 Secured by Stripe</span>
+    <span style="font-size:0.8rem;color:var(--text-muted)">✓ No subscription</span>
+    <span style="font-size:0.8rem;color:var(--text-muted)">✓ Instant delivery</span>
+  </div>
+
 </div>
 {% endblock %}
