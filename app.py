@@ -135,7 +135,7 @@ def register():
             "last_reset": now,
             "api_key1": str(uuid.uuid4()),
             "api_key2": str(uuid.uuid4()),
-        }).execute()
+        }).select().execute()
 
         user = User(result.data[0])
         login_user(user)
