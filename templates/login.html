@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Log in · PercfectAI{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <h2>Welcome back</h2>
+    <p class="auth-sub">Log in to your PercfectAI account</p>
+    <form method="POST">
+      <div class="mb-3">
+        <label class="form-label">Username</label>
+        <input class="form-control" name="username" required autocomplete="username" />
+      </div>
+      <div class="mb-4">
+        <label class="form-label">Password</label>
+        <input class="form-control" type="password" name="password" required autocomplete="current-password" />
+      </div>
+      <button type="submit" class="btn btn-accent w-100 py-2">Log in</button>
+    </form>
+    <p class="text-center mt-3" style="font-size:0.875rem;color:var(--text-muted)">
+      No account? <a href="/register" style="color:var(--accent)">Get started free</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

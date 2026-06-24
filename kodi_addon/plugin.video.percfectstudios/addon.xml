@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<addon id="plugin.video.percfectstudios"
+       name="PercfectStudios"
+       version="1.0.0"
+       provider-name="PercfectAI">
+  <requires>
+    <import addon="xbmc.python" version="3.0.0"/>
+    <import addon="xbmc.gui" version="5.14.0"/>
+  </requires>
+  <extension point="xbmc.python.pluginsource" library="default.py">
+    <provides>video image</provides>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en">AI Image &amp; Video Generator — powered by xAI</summary>
+    <description lang="en">Generate stunning AI images and videos directly on your TV using PercfectStudios. Powered by xAI Aurora. Enter your API key from percfectai.com to get started.</description>
+    <disclaimer lang="en">Requires a PercfectStudios account at percfectai.com. Credits are consumed per generation.</disclaimer>
+    <platform>all</platform>
+    <language>en</language>
+  </extension>
+</addon>

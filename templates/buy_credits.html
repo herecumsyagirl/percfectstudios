@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Buy Credits · PercfectAI{% endblock %}
+{% block content %}
+<div class="container py-5">
+  <div class="text-center mb-5">
+    <h2 style="font-weight:700;letter-spacing:-0.02em;">Buy Credits</h2>
+    <p style="color:var(--text-muted)">Top up your image and video generation credits</p>
+  </div>
+
+  <div class="row g-4 justify-content-center">
+
+    {% for key, pkg in packages.items() %}
+    <div class="col-md-4">
+      <div class="card p-4 text-center {% if key == 'creator' %}featured-plan{% endif %}">
+        {% if key == 'creator' %}
+          <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);margin-bottom:0.75rem;">Most Popular</div>
+        {% endif %}
+
+        <h5 class="mb-1" style="font-weight:700;">{{ pkg.name }}</h5>
+        <div style="font-size:2.25rem;font-weight:700;color:var(--accent-2);font-family:var(--font-mono);line-height:1.1;">
+          ${{ (pkg.price / 100) | int }}
+        </div>
+        <p style="color:var(--text-muted);font-size:0.875rem;margin:0.75rem 0 1.5rem;">
+          {{ pkg.image_credits }} image credits
+          {% if pkg.video_credits %} · {{ pkg.video_credits }} video credits{% endif %}
+        </p>
+
+        <form action="/create-checkout-session" method="POST">
+          <input type="hidden" name="package" value="{{ key }}" />
+          <button type="submit" class="btn btn-accent w-100 py-2">
+            Buy {{ pkg.name }}
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+
+  </div>
+
+  <p class="text-center mt-4" style="font-size:0.8rem;color:var(--text-muted)">
+    Payments processed securely by Stripe · Credits never expire
+  </p>
+</div>
+{% endblock %}

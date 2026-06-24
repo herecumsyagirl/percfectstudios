@@ -1,0 +1,9 @@
+flask==3.0.3
+flask-login==0.6.3
+flask-sqlalchemy==3.1.1
+werkzeug==3.0.3
+supabase==2.5.3
+python-dotenv==1.0.1
+requests==2.32.3
+gunicorn==22.0.0
+stripe==10.5.0

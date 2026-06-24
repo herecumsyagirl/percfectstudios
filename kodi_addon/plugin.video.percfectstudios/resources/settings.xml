@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<settings>
+  <category label="PercfectStudios">
+    <setting id="api_url"  type="text"   label="API URL"     default="https://percfectstudios.onrender.com"/>
+    <setting id="api_key"  type="text"   label="Your API Key" default="" option="hidden"/>
+  </category>
+</settings>

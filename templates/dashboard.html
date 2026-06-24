@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · PercfectAI{% endblock %}
+{% block content %}
+<div class="container py-5">
+  <h2 class="mb-4" style="font-weight:700;letter-spacing:-0.02em;">Dashboard</h2>
+
+  <div class="row g-3 mb-5">
+    <div class="col-6 col-md-3">
+      <div class="dash-stat">
+        <div class="label">Image Credits</div>
+        <div class="value">{{ user.picture_credits }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="dash-stat">
+        <div class="label">Video Credits</div>
+        <div class="value">{{ user.video_credits }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="dash-stat">
+        <div class="label">Images Today</div>
+        <div class="value">{{ user.images_today }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="dash-stat">
+        <div class="label">Videos Today</div>
+        <div class="value">{{ user.videos_today }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0">Recent Generations</h5>
+    <a href="/percfectstudios" class="btn btn-accent btn-sm">+ New generation</a>
+  </div>
+
+  {% if generations %}
+  <div class="gallery-grid">
+    {% for g in generations %}
+    <div class="gallery-item">
+      {% if g.type == 'image' %}
+        <img src="{{ g.output_url }}" alt="{{ g.prompt }}" loading="lazy" />
+      {% else %}
+        <video src="{{ g.output_url }}" muted loop autoplay></video>
+      {% endif %}
+      <span class="type-badge">{{ g.type }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-muted text-center py-5">
+    No generations yet. <a href="/percfectstudios" style="color:var(--accent)">Create your first one →</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
