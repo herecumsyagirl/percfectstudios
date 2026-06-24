@@ -7,3 +7,6 @@ venv/
 *.egg-info/
 dist/
 .DS_Store
+.agents/
+skills-lock.json
+kodi_addon/
