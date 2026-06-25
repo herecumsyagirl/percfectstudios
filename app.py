@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, g, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, g, session, Response
+from urllib.parse import urlparse
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -358,6 +359,47 @@ def logout():
 
 
 # ── Health ping (UptimeRobot keeps Render awake) ─────────
+SHARE_MEDIA_HOST_SUFFIXES = ("x.ai", "supabase.co")
+
+
+def _twitter_handle(user_data):
+    raw = (user_data or {}).get("social_twitter", "")
+    if not raw:
+        return ""
+    raw = raw.strip()
+    if raw.startswith("http"):
+        part = raw.rstrip("/").split("/")[-1]
+        return part.lstrip("@")
+    return raw.lstrip("@")
+
+
+def _is_allowed_share_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        host = parsed.netloc.lower()
+        return any(host == suffix or host.endswith("." + suffix) for suffix in SHARE_MEDIA_HOST_SUFFIXES)
+    except Exception:
+        return False
+
+
+@app.route("/share/fetch")
+def share_fetch_media():
+    """Same-origin proxy so mobile Web Share can attach image/video files."""
+    url = request.args.get("url", "").strip()
+    if not url or not _is_allowed_share_url(url):
+        return jsonify({"error": "Invalid media URL."}), 400
+    try:
+        upstream = requests.get(url, timeout=60, stream=True)
+        if not upstream.ok:
+            return jsonify({"error": "Could not fetch media."}), 502
+        content_type = upstream.headers.get("Content-Type", "application/octet-stream")
+        return Response(upstream.content, mimetype=content_type)
+    except Exception:
+        return jsonify({"error": "Fetch failed."}), 500
+
+
 @app.route("/ping")
 def ping():
     return "ok", 200
@@ -446,6 +488,17 @@ def _load_settings_user(user_id):
             "username,email,birthday,picture_credits,video_credits,images_today,videos_today,created_at"
         ).eq("id", user_id).single().execute()
         return res.data or {}
+
+
+@app.context_processor
+def inject_share_context():
+    handle = ""
+    if current_user.is_authenticated:
+        try:
+            handle = _twitter_handle(_load_settings_user(current_user.id))
+        except Exception:
+            pass
+    return {"twitter_handle": handle}
 
 
 def _ensure_stripe_customer(user_data: dict):

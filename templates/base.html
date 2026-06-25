@@ -101,6 +101,15 @@ a:hover { color: var(--accent-3); }
 }
 .btn-outline-accent:hover { border-color: var(--accent); background: rgba(124,92,252,0.08); color: var(--accent-3) !important; }
 
+.btn-share-x {
+  background: #000 !important; color: #fff !important;
+  border: 1px solid #333 !important; border-radius: 12px;
+  padding: 0.45rem 1rem; font-weight: 600; font-size: 0.8rem;
+  cursor: pointer; text-decoration: none; display: inline-flex;
+  align-items: center; gap: 0.35rem; transition: all 0.2s;
+}
+.btn-share-x:hover { background: #1a1a1a !important; color: #fff !important; transform: translateY(-1px); }
+
 /* ── Cards ──────────────────────────────────────────── */
 .card {
   background: var(--bg-2) !important;
@@ -597,6 +606,40 @@ textarea.form-control { resize: vertical; min-height: 96px; }
   function openAuthModal(tab) {
     switchAuthTab(tab || 'signup');
     new bootstrap.Modal(document.getElementById('authModal')).show();
+  }
+
+  /** Post image or video to X / Twitter */
+  async function shareToX(mediaUrl, type, promptText) {
+    if (!mediaUrl) return;
+    const site = 'https://percfectai.com/percfectstudios';
+    const xHandle = {{ twitter_handle|tojson }};
+    const tag = xHandle ? '@' + xHandle : '@PercfectAI';
+    let line = 'Made with PercfectAI ✨';
+    if (promptText) {
+      const short = promptText.length > 100 ? promptText.slice(0, 97) + '…' : promptText;
+      line = '"' + short + '" — AI ' + (type === 'video' ? 'video' : 'art') + ' via PercfectAI';
+    }
+    const tweetText = line + ' ' + tag + '\n' + site;
+
+    try {
+      const proxy = '/share/fetch?url=' + encodeURIComponent(mediaUrl);
+      const resp = await fetch(proxy);
+      if (resp.ok) {
+        const blob = await resp.blob();
+        const ext = type === 'video' ? 'mp4' : 'jpg';
+        const mime = type === 'video' ? 'video/mp4' : (blob.type || 'image/jpeg');
+        const file = new File([blob], 'percfect-' + type + '.' + ext, { type: mime });
+        const shareData = { text: line, files: [file] };
+        if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          return;
+        }
+      }
+    } catch (e) { /* fall through to X compose */ }
+
+    const intent = 'https://x.com/intent/tweet?text=' + encodeURIComponent(tweetText)
+      + '&url=' + encodeURIComponent(mediaUrl);
+    window.open(intent, '_blank', 'noopener,noreferrer,width=580,height=520');
   }
 </script>
 

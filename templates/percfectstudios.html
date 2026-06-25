@@ -101,6 +101,7 @@
 
         <div id="img-actions" style="display:none" class="output-actions">
           <a id="img-download" href="#" download="percfect-image.jpg" class="btn-outline-accent btn-sm">↓ Download</a>
+          <button type="button" class="btn-share-x btn-sm" onclick="shareToX(document.getElementById('img-result').src,'image',document.getElementById('img-prompt').value)">𝕏 Post to X</button>
           <button onclick="sendToVideo()" class="btn-outline-accent btn-sm">▶ Animate this</button>
         </div>
         <div id="img-error" class="gen-error" style="display:none"></div>
@@ -173,6 +174,7 @@
 
         <div id="vid-actions" style="display:none" class="output-actions">
           <a id="vid-download" href="#" download="percfect-video.mp4" class="btn-outline-accent btn-sm">↓ Download</a>
+          <button type="button" class="btn-share-x btn-sm" onclick="shareToX(document.getElementById('vid-result').src,'video',document.getElementById('vid-prompt').value)">𝕏 Post to X</button>
         </div>
         <div id="vid-error" class="gen-error" style="display:none"></div>
       </div>

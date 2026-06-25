@@ -39,13 +39,16 @@
   {% if generations %}
   <div class="gallery-grid">
     {% for g in generations %}
-    <div class="gallery-item">
+    <div class="gallery-item" style="position:relative;">
       {% if g.type == 'image' %}
         <img src="{{ g.output_url }}" alt="{{ g.prompt }}" loading="lazy" />
       {% else %}
         <video src="{{ g.output_url }}" muted loop autoplay></video>
       {% endif %}
       <span class="type-badge">{{ g.type }}</span>
+      <button type="button" class="btn-share-x btn-sm"
+        style="position:absolute;bottom:8px;right:8px;padding:0.35rem 0.65rem;font-size:0.72rem;"
+        onclick="shareToX({{ g.output_url|tojson }}, {{ g.type|tojson }}, {{ (g.prompt or '')|tojson }})">𝕏</button>
     </div>
     {% endfor %}
   </div>
