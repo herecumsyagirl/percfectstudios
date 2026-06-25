@@ -92,7 +92,7 @@ def generate_image_xai(prompt: str) -> dict:
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "grok-2-image-1212",
+        "model": "grok-imagine-image",
         "prompt": prompt,
         "n": 1,
     }
