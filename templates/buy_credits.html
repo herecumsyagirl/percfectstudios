@@ -11,6 +11,11 @@
     <p style="color:var(--text-muted);font-size:1rem;max-width:400px;margin:0 auto;">One-time purchases. Credits never expire. Payments secured by Stripe.</p>
   </div>
 
+  <div style="max-width:520px;margin:0 auto 2rem;">
+    {% set redirect_url = '/buy-credits' %}
+    {% include '_offers_promo.html' %}
+  </div>
+
   <div class="row g-4 justify-content-center" style="max-width:860px;margin:0 auto;">
 
     {% for key, pkg in packages.items() %}
@@ -57,6 +62,7 @@
 
         <form action="/create-checkout-session" method="POST" style="margin-top:auto;">
           <input type="hidden" name="package" value="{{ key }}" />
+          {% if checkout_promo %}<input type="hidden" name="promo_code" value="{{ checkout_promo }}" />{% endif %}
           <button type="submit" class="{% if key == 'creator' %}btn-accent{% else %}btn-outline-accent{% endif %} w-100 py-2" style="border-radius:10px;font-weight:600;border:{% if key != 'creator' %}1px solid var(--accent){% else %}none{% endif %};background:{% if key == 'creator' %}var(--accent){% else %}transparent{% endif %};color:{% if key == 'creator' %}#fff{% else %}var(--accent-2){% endif %};cursor:pointer;transition:all 0.2s;">
             Get {{ pkg.name }}
           </button>

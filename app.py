@@ -582,6 +582,15 @@ def account_settings():
             user_data.update(updates)
             success = "Social profiles saved."
 
+        elif action == "promo":
+            active_tab = "offers"
+            result, err = _redeem_promo(current_user.id, request.form.get("code", ""))
+            if err:
+                error = err
+            else:
+                success = result["message"]
+                user_data = _load_settings_user(current_user.id)
+
         elif action == "password":
             pw_res = supabase.table("users").select("password").eq("id", current_user.id).single().execute()
             stored_hash = (pw_res.data or {}).get("password", "")
@@ -599,11 +608,13 @@ def account_settings():
                 success = "Password updated."
 
     billing = _get_billing_info(user_data.get("stripe_customer_id"))
+    checkout_promo = session.get("stripe_promo_code")
     return render_template(
         "settings.html",
         user=user_data,
         billing=billing,
         packages=CREDIT_PACKAGES,
+        checkout_promo=checkout_promo,
         success=success,
         error=error,
         active_tab=active_tab,
@@ -721,12 +732,152 @@ def generate_video():
         return jsonify({"error": str(e)}), 500
 
 
+# ── Promo / Offers ────────────────────────────────────────
+def _normalize_promo_code(code: str) -> str:
+    return "".join((code or "").upper().split())
+
+
+def _lookup_stripe_promo(code: str):
+    if not stripe.api_key:
+        return None
+    try:
+        promos = stripe.PromotionCode.list(code=_normalize_promo_code(code), active=True, limit=1)
+        if promos.data:
+            return promos.data[0].id
+    except Exception:
+        pass
+    return None
+
+
+def _redeem_db_promo(user_id, code: str):
+    normalized = _normalize_promo_code(code)
+    if not normalized:
+        return None, "Enter a promo code."
+
+    try:
+        res = supabase.table("promo_codes").select("*").eq("code", normalized).eq("active", True).maybe_single().execute()
+    except Exception:
+        return None, "Promo codes are not set up yet. Run the promo_codes SQL in Supabase."
+
+    promo = res.data
+    if not promo:
+        return None, None
+
+    if promo.get("expires_at"):
+        try:
+            expires = datetime.datetime.fromisoformat(str(promo["expires_at"]).replace("Z", "+00:00"))
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=datetime.timezone.utc)
+            if expires < datetime.datetime.now(datetime.timezone.utc):
+                return None, "This promo code has expired."
+        except Exception:
+            pass
+
+    max_uses = promo.get("max_uses")
+    if max_uses is not None and (promo.get("uses_count") or 0) >= max_uses:
+        return None, "This promo code has reached its usage limit."
+
+    try:
+        prior = supabase.table("promo_redemptions").select("id").eq("user_id", user_id).eq("promo_code_id", promo["id"]).execute()
+        if prior.data and len(prior.data) >= (promo.get("max_uses_per_user") or 1):
+            return None, "You have already redeemed this code."
+    except Exception:
+        pass
+
+    img = int(promo.get("image_credits") or 0)
+    vid = int(promo.get("video_credits") or 0)
+    if img <= 0 and vid <= 0:
+        return None, "This promo code has no credits attached."
+
+    user_res = supabase.table("users").select("picture_credits,video_credits").eq("id", user_id).single().execute()
+    u = user_res.data or {}
+    supabase.table("users").update({
+        "picture_credits": (u.get("picture_credits") or 0) + img,
+        "video_credits": (u.get("video_credits") or 0) + vid,
+    }).eq("id", user_id).execute()
+
+    try:
+        supabase.table("promo_redemptions").insert({
+            "user_id": user_id,
+            "promo_code_id": promo["id"],
+        }).execute()
+        supabase.table("promo_codes").update({
+            "uses_count": (promo.get("uses_count") or 0) + 1,
+        }).eq("id", promo["id"]).execute()
+    except Exception:
+        pass
+
+    parts = []
+    if img:
+        parts.append(f"{img} image credits")
+    if vid:
+        parts.append(f"{vid} video seconds")
+    msg = f"Code redeemed! Added {' and '.join(parts)}."
+    if promo.get("description"):
+        msg = f"{promo['description']} — {msg}"
+    return {"ok": True, "message": msg, "image_credits": img, "video_credits": vid}, None
+
+
+def _redeem_promo(user_id, code: str):
+    result, db_err = _redeem_db_promo(user_id, code)
+    if result:
+        return result, None
+    if db_err and "not set up" not in db_err:
+        return None, db_err
+
+    stripe_id = _lookup_stripe_promo(code)
+    if stripe_id:
+        session["stripe_promo_id"] = stripe_id
+        session["stripe_promo_code"] = _normalize_promo_code(code)
+        session.modified = True
+        return {
+            "ok": True,
+            "checkout_only": True,
+            "message": f"Discount code {_normalize_promo_code(code)} will apply at checkout.",
+        }, None
+
+    return None, db_err or "Invalid or expired promo code."
+
+
+@app.route("/redeem-promo", methods=["POST"])
+@login_required
+def redeem_promo():
+    code = request.form.get("code", "").strip()
+    if request.is_json:
+        code = (request.get_json() or {}).get("code", code).strip()
+
+    result, err = _redeem_promo(current_user.id, code)
+    wants_json = request.is_json or "application/json" in request.headers.get("Accept", "")
+
+    if err:
+        if wants_json:
+            return jsonify({"error": err}), 400
+        flash(err, "danger")
+        return redirect(request.referrer or url_for("buy_credits"))
+
+    if wants_json:
+        return jsonify(result)
+
+    flash(result["message"], "success")
+    dest = request.form.get("redirect") or request.referrer or url_for("buy_credits")
+    if "#" in dest:
+        return redirect(dest)
+    tab = request.form.get("tab", "offers")
+    if "settings" in dest:
+        return redirect(url_for("account_settings") + f"#{tab}")
+    return redirect(dest)
+
+
 # ── Stripe: Buy Credits ───────────────────────────────────
 @app.route("/buy-credits")
 @login_required
 def buy_credits():
-    return render_template("buy_credits.html", packages=CREDIT_PACKAGES,
-                           stripe_pk=os.getenv("STRIPE_PUBLISHABLE_KEY"))
+    return render_template(
+        "buy_credits.html",
+        packages=CREDIT_PACKAGES,
+        stripe_pk=os.getenv("STRIPE_PUBLISHABLE_KEY"),
+        checkout_promo=session.get("stripe_promo_code"),
+    )
 
 
 @app.route("/create-checkout-session", methods=["POST"])
@@ -756,8 +907,17 @@ def create_checkout_session():
         checkout_kwargs["customer"] = customer_id
     elif user_data.get("email"):
         checkout_kwargs["customer_email"] = user_data["email"]
-    session = stripe.checkout.Session.create(**checkout_kwargs)
-    return redirect(session.url, code=303)
+
+    promo_id = session.pop("stripe_promo_id", None)
+    if promo_id:
+        checkout_kwargs["discounts"] = [{"promotion_code": promo_id}]
+    elif request.form.get("promo_code"):
+        stripe_id = _lookup_stripe_promo(request.form.get("promo_code"))
+        if stripe_id:
+            checkout_kwargs["discounts"] = [{"promotion_code": stripe_id}]
+
+    session_stripe = stripe.checkout.Session.create(**checkout_kwargs)
+    return redirect(session_stripe.url, code=303)
 
 
 @app.route("/payment-success")

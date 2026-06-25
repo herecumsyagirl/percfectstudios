@@ -1,0 +1,48 @@
+{# Offers promo code block — include with optional compact=1 #}
+<style>
+  .offers-card {
+    background: linear-gradient(135deg, rgba(124,92,252,0.12), rgba(224,64,251,0.06));
+    border: 1px solid rgba(124,92,252,0.35);
+    border-radius: 16px;
+    padding: {% if compact %}1.25rem{% else %}1.5rem{% endif %};
+    margin-bottom: {% if compact %}0{% else %}1.5rem{% endif %};
+  }
+  .offers-card h3, .offers-card .offers-title {
+    font-size: {% if compact %}0.95rem{% else %}1.1rem{% endif %};
+    font-weight: 800; margin-bottom: 0.35rem; letter-spacing: -0.02em;
+  }
+  .offers-card .offers-sub {
+    color: var(--text-muted); font-size: 0.82rem; margin-bottom: 1rem;
+  }
+  .offers-form { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .offers-input {
+    flex: 1; min-width: 160px;
+    background: var(--bg-3); border: 1px solid var(--border-2);
+    color: var(--text); border-radius: 10px; padding: 0.65rem 0.9rem;
+    font-size: 0.9rem; font-family: var(--font-mono); letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .offers-input:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,92,252,0.15);
+  }
+  .offers-applied {
+    margin-top: 0.75rem; font-size: 0.82rem; color: var(--success);
+    background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.25);
+    border-radius: 10px; padding: 0.55rem 0.85rem;
+  }
+</style>
+
+<div class="offers-card">
+  <div class="offers-title">🎁 Offers</div>
+  <p class="offers-sub">Have a promo code? Redeem free credits or apply a checkout discount.</p>
+  <form class="offers-form" method="POST" action="/redeem-promo">
+    <input type="hidden" name="redirect" value="{{ redirect_url or '' }}">
+    <input type="hidden" name="tab" value="offers">
+    <input type="text" name="code" class="offers-input" placeholder="PROMO CODE" maxlength="32" autocomplete="off" required>
+    <button type="submit" class="btn btn-accent" style="white-space:nowrap;">Apply Code</button>
+  </form>
+  {% if checkout_promo %}
+  <div class="offers-applied">✓ <strong>{{ checkout_promo }}</strong> ready — discount applies on your next checkout.</div>
+  {% endif %}
+</div>
