@@ -4,6 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
 from functools import wraps
 import os
+import base64
 import uuid
 import datetime
 import requests
@@ -86,17 +87,44 @@ def reset_daily_if_needed(user_id):
         }).eq("id", user_id).execute()
 
 
-def generate_image_xai(prompt: str) -> dict:
+
+def _file_to_data_uri(file_storage):
+    data = file_storage.read()
+    mime = file_storage.mimetype or "image/jpeg"
+    if mime not in ("image/jpeg", "image/png", "image/webp", "image/gif"):
+        mime = "image/jpeg"
+    b64 = base64.b64encode(data).decode()
+    return f"data:{mime};base64,{b64}"
+
+
+def _get_form_image_url():
+    image_url = request.form.get("image_url", "").strip() or None
+    file = request.files.get("image_file")
+    if file and file.filename:
+        return _file_to_data_uri(file)
+    return image_url
+
+
+def generate_image_xai(prompt: str, image_url: str = None) -> dict:
     headers = {
         "Authorization": f"Bearer {XAI_API_KEY}",
         "Content-Type": "application/json"
     }
-    payload = {
-        "model": "grok-imagine-image",
-        "prompt": prompt,
-        "n": 1,
-    }
-    resp = requests.post(f"{XAI_BASE_URL}/images/generations", json=payload, headers=headers, timeout=60)
+    if image_url:
+        payload = {
+            "model": "grok-imagine-image",
+            "prompt": prompt,
+            "image": {"url": image_url},
+        }
+        endpoint = f"{XAI_BASE_URL}/images/edits"
+    else:
+        payload = {
+            "model": "grok-imagine-image",
+            "prompt": prompt,
+            "n": 1,
+        }
+        endpoint = f"{XAI_BASE_URL}/images/generations"
+    resp = requests.post(endpoint, json=payload, headers=headers, timeout=90)
     if not resp.ok:
         raise Exception(f"xAI image error {resp.status_code}: {resp.text}")
     return resp.json()
@@ -338,9 +366,10 @@ def generate_image():
         return jsonify({"error": "Prompt is required."}), 400
 
     full_prompt = f"{prompt}. Style: {style}" if style else prompt
+    source_image = _get_form_image_url()
 
     try:
-        result = generate_image_xai(full_prompt)
+        result = generate_image_xai(full_prompt, source_image)
         image_url = result["data"][0]["url"]
 
         if not current_user.is_admin:
@@ -371,7 +400,7 @@ def generate_video():
     user_data = res.data
 
     prompt = request.form.get("prompt", "").strip()
-    image_url = request.form.get("image_url", "").strip() or None
+    image_url = _get_form_image_url()
     duration = int(request.form.get("duration", 6))
     duration = max(5, min(15, duration))  # clamp 5-15 seconds
 
@@ -527,11 +556,12 @@ def api_generate_image():
 
     body = request.get_json(silent=True) or {}
     prompt = body.get("prompt", "").strip()
+    source_image = (body.get("image_url") or "").strip() or None
     if not prompt:
         return jsonify({"error": "prompt is required"}), 400
 
     try:
-        result = generate_image_xai(prompt)
+        result = generate_image_xai(prompt, source_image)
         image_url = result["data"][0]["url"]
 
         supabase.table("users").update({

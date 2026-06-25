@@ -69,6 +69,16 @@
           </div>
         </div>
 
+        <div class="mb-3">
+          <label class="form-label">Reference photo <span class="form-hint">optional — image-to-image</span></label>
+          <div id="img-drop-zone" onclick="document.getElementById('img-file-input').click()">
+            <span id="img-drop-label">Drop image here or click to upload</span>
+            <img id="img-drop-preview" src="" alt="" style="display:none;max-height:80px;border-radius:8px;margin-top:0.5rem;" />
+          </div>
+          <input type="file" id="img-file-input" accept="image/*" style="display:none" onchange="handleImgFileSelect(this)" />
+          <input class="form-control mt-2" id="img-image-url" type="url" placeholder="…or paste an image URL" style="font-size:0.8rem;padding:0.45rem 0.75rem;" />
+        </div>
+
         <button class="generate-btn" id="img-btn" onclick="generateImage()">
           <span id="img-btn-text">✦ Generate image</span>
           <span id="img-btn-spinner" style="display:none">Generating…</span>
@@ -225,16 +235,16 @@
 }
 
 /* Drop zone */
-#drop-zone {
+#drop-zone,#img-drop-zone {
   border:2px dashed var(--border-2);border-radius:12px;
   padding:1.25rem;text-align:center;cursor:pointer;
   transition:all .2s;color:var(--text-muted);font-size:.85rem;
   background:var(--bg-3);
 }
-#drop-zone:hover,#drop-zone.drag-over {
+#drop-zone:hover,#img-drop-zone:hover,#drop-zone.drag-over,#img-drop-zone.drag-over {
   border-color:var(--accent);background:rgba(124,92,252,.06);color:var(--accent-2);
 }
-#drop-zone.has-image { border-style:solid;border-color:var(--accent); }
+#drop-zone.has-image,#img-drop-zone.has-image { border-style:solid;border-color:var(--accent); }
 
 /* Prompt pills */
 .prompt-pills { display:flex;flex-wrap:wrap;gap:.5rem; }
@@ -379,6 +389,9 @@ async function _generateImage() {
   fd.append('prompt', prompt);
   const style = document.querySelector('#img-style-chips .style-chip.active');
   if (style) fd.append('style', style.textContent.trim());
+  const imgUrl = document.getElementById('img-image-url').value.trim();
+  if (imgUrl) fd.append('image_url', imgUrl);
+  if (window._droppedImgFile) fd.append('image_file', window._droppedImgFile);
   try {
     const res = await fetch('/percfectstudios/generate-image', {method:'POST', body:fd});
     const data = await res.json();
@@ -482,35 +495,41 @@ function setDuration(chip, secs) {
 }
 
 /* ── Drag & drop ───────────────────────────────── */
-function setupDropZone() {
-  const zone = document.getElementById('drop-zone');
+function setupDropZone(zoneId, previewId, labelId, urlInputId, fileVarSetter) {
+  const zone = document.getElementById(zoneId);
+  if (!zone) return;
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
   zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
   zone.addEventListener('drop', e => {
     e.preventDefault(); zone.classList.remove('drag-over');
     const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) loadDroppedFile(file);
+    if (file && file.type.startsWith('image/')) loadDroppedFile(file, zoneId, previewId, labelId, urlInputId, fileVarSetter);
   });
 }
 function handleFileSelect(input) {
-  if (input.files[0]) loadDroppedFile(input.files[0]);
+  if (input.files[0]) loadDroppedFile(input.files[0], 'drop-zone', 'drop-preview', 'drop-label', 'vid-image-url', f => window._droppedImageFile = f);
 }
-function loadDroppedFile(file) {
+function handleImgFileSelect(input) {
+  if (input.files[0]) loadDroppedFile(input.files[0], 'img-drop-zone', 'img-drop-preview', 'img-drop-label', 'img-image-url', f => window._droppedImgFile = f);
+}
+function loadDroppedFile(file, zoneId, previewId, labelId, urlInputId, fileVarSetter) {
   const reader = new FileReader();
   reader.onload = e => {
-    const zone = document.getElementById('drop-zone');
-    const preview = document.getElementById('drop-preview');
-    const label = document.getElementById('drop-label');
+    const zone = document.getElementById(zoneId);
+    const preview = document.getElementById(previewId);
+    const label = document.getElementById(labelId);
     preview.src = e.target.result;
     preview.style.display = 'block';
     label.textContent = file.name;
     zone.classList.add('has-image');
-    window._droppedImageFile = file;
-    document.getElementById('vid-image-url').value = '';
+    fileVarSetter(file);
+    const urlEl = document.getElementById(urlInputId);
+    if (urlEl) urlEl.value = '';
   };
   reader.readAsDataURL(file);
 }
-setupDropZone();
+setupDropZone('drop-zone', 'drop-preview', 'drop-label', 'vid-image-url', f => window._droppedImageFile = f);
+setupDropZone('img-drop-zone', 'img-drop-preview', 'img-drop-label', 'img-image-url', f => window._droppedImgFile = f);
 
 /* ── Gallery ───────────────────────────────────── */
 async function loadGallery() {

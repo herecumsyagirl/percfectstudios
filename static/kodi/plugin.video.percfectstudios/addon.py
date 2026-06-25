@@ -7,6 +7,9 @@ import urllib.parse
 import urllib.request
 import urllib.error
 import json
+import os
+import base64
+import mimetypes
 import time
 import random
 import string
@@ -125,6 +128,45 @@ def verify_pin():
     return False
 
 
+def get_save_folder():
+    folder = ADDON.getSetting('save_folder') or 'special://profile/addon_data/plugin.video.percfectstudios/generations/'
+    return xbmc.translatePath(folder)
+
+
+def should_auto_save():
+    return ADDON.getSetting('auto_save') != 'false'
+
+
+def pick_image_file():
+    path = xbmcgui.Dialog().browse(1, 'Select a photo', 'files', '', False, False, ['.jpg', '.jpeg', '.png', '.webp'])
+    return path or None
+
+
+def file_to_data_uri(path):
+    mime = mimetypes.guess_type(path)[0] or 'image/jpeg'
+    with open(path, 'rb') as f:
+        b64 = base64.b64encode(f.read()).decode()
+    return f'data:{mime};base64,{b64}'
+
+
+def save_generation(url, kind, prompt):
+    if not should_auto_save() or not url:
+        return None
+    folder = get_save_folder()
+    try:
+        os.makedirs(folder, exist_ok=True)
+    except Exception:
+        return None
+    ext = 'jpg' if kind == 'image' else 'mp4'
+    safe = ''.join(c if c.isalnum() or c in '-_' else '_' for c in (prompt or 'gen')[:24])
+    dest = os.path.join(folder, f'{safe}_{int(time.time())}.{ext}')
+    try:
+        urllib.request.urlretrieve(url, dest)
+        return dest
+    except Exception:
+        return None
+
+
 def credits_header(credits):
     return f'[B]{credits.get("image_credits", 0)}[/B] images · [B]{credits.get("video_credits", 0)}s[/B] video'
 
@@ -135,6 +177,15 @@ def generate_image():
         show_buy_credits('You have no image credits left.')
         return
     dialog = xbmcgui.Dialog()
+    mode = dialog.select('Generate Image', ['Text prompt only', 'Use my photo (image-to-image)'])
+    if mode < 0:
+        return
+    source_image = None
+    if mode == 1:
+        path = pick_image_file()
+        if not path:
+            return
+        source_image = file_to_data_uri(path)
     prompt = dialog.input('Describe your image', type=xbmcgui.INPUT_ALPHANUM)
     if not prompt:
         return
@@ -142,12 +193,18 @@ def generate_image():
     progress.create('PercfectStudios', 'Generating your image...')
     progress.update(20)
     try:
-        data = api_request('POST', '/api/generate/image', {'prompt': prompt}, timeout=90)
+        payload = {'prompt': prompt}
+        if source_image:
+            payload['image_url'] = source_image
+        data = api_request('POST', '/api/generate/image', payload, timeout=90)
         progress.update(90)
         progress.close()
         url = data.get('url')
         if url:
+            saved = save_generation(url, 'image', prompt)
             xbmc.executebuiltin(f'ShowPicture({url})')
+            if saved:
+                xbmcgui.Dialog().notification('PercfectStudios', f'Saved to {saved}', xbmcgui.NOTIFICATION_INFO, 4000)
     except urllib.error.HTTPError as e:
         progress.close()
         try:
@@ -170,6 +227,15 @@ def generate_video():
         show_buy_credits('You have no video seconds left.')
         return
     dialog = xbmcgui.Dialog()
+    mode = dialog.select('Generate Video', ['Text prompt only', 'Animate my photo'])
+    if mode < 0:
+        return
+    source_image = None
+    if mode == 1:
+        path = pick_image_file()
+        if not path:
+            return
+        source_image = file_to_data_uri(path)
     durations = ['5 seconds', '6 seconds', '10 seconds', '15 seconds']
     dur_secs = [5, 6, 10, 15]
     idx = dialog.select(f'Video length ({vid_c}s available)', durations)
@@ -191,14 +257,20 @@ def generate_video():
         time.sleep(2)
         progress.update(pct, f'Generating {duration}s video... {pct}%')
     try:
-        data = api_request('POST', '/api/generate/video', {'prompt': prompt, 'duration': duration}, timeout=200)
+        payload = {'prompt': prompt, 'duration': duration}
+        if source_image:
+            payload['image_url'] = source_image
+        data = api_request('POST', '/api/generate/video', payload, timeout=200)
         progress.update(95)
         progress.close()
         url = data.get('url')
         if url:
+            saved = save_generation(url, 'video', prompt)
             li = xbmcgui.ListItem(prompt, path=url)
             li.setInfo('video', {'title': prompt})
             xbmc.Player().play(url, li)
+            if saved:
+                xbmcgui.Dialog().notification('PercfectStudios', f'Saved to {saved}', xbmcgui.NOTIFICATION_INFO, 4000)
     except urllib.error.HTTPError as e:
         progress.close()
         try:
@@ -272,6 +344,7 @@ def main_menu():
         ('My Gallery', 'gallery'),
         ('Buy Credits', 'buy_credits'),
         ('Refresh Credits', 'refresh'),
+        ('Settings', 'settings'),
         ('Disconnect', 'disconnect'),
     ]:
         li = xbmcgui.ListItem(label=label)
@@ -296,6 +369,9 @@ elif action == 'buy_credits':
 elif action == 'refresh':
     xbmc.executebuiltin('Container.Refresh')
     main_menu()
+elif action == 'settings':
+    ADDON.openSettings()
+    xbmc.executebuiltin('Container.Refresh')
 elif action == 'disconnect':
     if xbmcgui.Dialog().yesno('Disconnect', 'Remove your account from this device?'):
         set_api_key('')
