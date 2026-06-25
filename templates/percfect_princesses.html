@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Percfect Princesses — AI Princess Generator{% endblock %}
+
+{% block content %}
+<style>
+  .pp-hero {
+    text-align: center;
+    padding: 2.5rem 1rem 1.5rem;
+  }
+  .pp-hero h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--purple-light), #e040fb);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0.4rem;
+  }
+  .pp-hero p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+  }
+  .pp-frame-wrap {
+    width: 100%;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 1rem 1rem;
+    position: relative;
+  }
+  .pp-frame-wrap iframe {
+    width: 100%;
+    height: 700px;
+    border: 1px solid var(--border-2);
+    border-radius: 16px;
+    background: var(--surface-1);
+  }
+  .pp-age-gate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 500px;
+    text-align: center;
+    gap: 1rem;
+  }
+  .pp-age-gate h2 { color: var(--text); font-weight: 700; }
+  .pp-age-gate p { color: var(--text-muted); max-width: 400px; }
+  .pp-age-gate a.btn-accent {
+    display: inline-block;
+    padding: 0.65rem 2rem;
+    background: var(--purple);
+    color: #fff;
+    border-radius: 10px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .pp-ad-banner {
+    max-width: 960px;
+    margin: 0 auto 1rem;
+    padding: 0 1rem;
+  }
+  .pp-ad-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    background: linear-gradient(135deg, rgba(124,92,252,0.18), rgba(224,64,251,0.12));
+    border: 1px solid rgba(124,92,252,0.35);
+    border-radius: 14px;
+    padding: 1rem 1.5rem;
+    flex-wrap: wrap;
+  }
+  .pp-ad-inner strong { color: var(--text); display: block; margin-top: 0.2rem; }
+  .pp-ad-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: var(--purple);
+    color: #fff;
+    padding: 0.15rem 0.6rem;
+    border-radius: 20px;
+    margin-right: 0.5rem;
+  }
+  .pp-ad-btn {
+    white-space: nowrap;
+    background: var(--purple);
+    color: #fff;
+    padding: 0.6rem 1.4rem;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-decoration: none;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .pp-ad-btn:hover { background: var(--purple-light); transform: translateY(-1px); }
+  .pp-footer {
+    text-align: center;
+    padding: 1.25rem 1rem 2rem;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+  }
+  .pp-footer a { color: var(--purple-light); text-decoration: none; }
+</style>
+
+<div class="pp-hero">
+  <h1>👑 Percfect Princesses</h1>
+  <p>Generate stunning AI princess characters — free, unlimited, no credits needed.</p>
+</div>
+
+<div class="pp-frame-wrap">
+  {% if not current_user.is_authenticated %}
+    {# Not logged in — show the generator freely, no age gate needed for SFW content #}
+    <iframe
+      src="https://perchance.org/9ujldjgr1f"
+      title="Percfect Princesses Generator"
+      allowfullscreen
+      loading="lazy"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+    ></iframe>
+  {% elif is_adult %}
+    <iframe
+      src="https://perchance.org/9ujldjgr1f"
+      title="Percfect Princesses Generator"
+      allowfullscreen
+      loading="lazy"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+    ></iframe>
+  {% else %}
+    <div class="pp-age-gate">
+      <h2>🔞 Age Verification Required</h2>
+      <p>This generator may contain mature content. You must be 18+ to access it. Please update your date of birth in your account settings.</p>
+      <a href="/dashboard" class="btn-accent">Go to Dashboard</a>
+    </div>
+  {% endif %}
+</div>
+
+<div class="pp-ad-banner">
+  <div class="pp-ad-inner">
+    <div>
+      <span class="pp-ad-badge">✨ Want more?</span>
+      <strong>Turn your princess into a video</strong> — generate stunning AI videos with PercfectAI.
+    </div>
+    <a href="/percfectstudios" class="pp-ad-btn">Try PercfectStudios →</a>
+  </div>
+</div>
+
+<div class="pp-footer">
+  Powered by <a href="https://x.ai" target="_blank" rel="noopener">xAI</a> &middot;
+  <a href="https://perchance.org" target="_blank" rel="noopener">Perchance</a>
+</div>
+{% endblock %}

@@ -784,5 +784,17 @@ def kodi_credits():
     })
 
 
+@app.route("/percfectprincesses")
+def percfect_princesses():
+    is_adult = False
+    if current_user.is_authenticated:
+        try:
+            row = supabase.table("users").select("is_adult").eq("id", current_user.id).single().execute()
+            is_adult = bool(row.data.get("is_adult", False))
+        except Exception:
+            is_adult = False
+    return render_template("percfect_princesses.html", is_adult=is_adult)
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
