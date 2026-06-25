@@ -115,54 +115,94 @@ def generate_video_xai(prompt: str, image_url: str = None) -> dict:
 
 
 # ── Auth Routes ───────────────────────────────────────────
+def _do_register(username, password, birthday=""):
+    exists = supabase.table("users").select("id").eq("username", username).execute()
+    if exists.data:
+        return None, "Username already taken."
+    hashed = generate_password_hash(password)
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    result = supabase.table("users").insert({
+        "username": username,
+        "password": hashed,
+        "birthday": birthday,
+        "picture_credits": 5,
+        "video_credits": 2,
+        "images_today": 0,
+        "videos_today": 0,
+        "last_reset": now,
+        "api_key1": str(uuid.uuid4()),
+        "api_key2": str(uuid.uuid4()),
+    }).select().execute()
+    return User(result.data[0]), None
+
+
+def _do_login(username, password):
+    res = supabase.table("users").select("*").eq("username", username).maybe_single().execute()
+    if res.data and check_password_hash(res.data["password"], password):
+        return User(res.data), None
+    return None, "Invalid username or password."
+
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "")
-        birthday = request.form.get("birthday", "")
-
-        exists = supabase.table("users").select("id").eq("username", username).execute()
-        if exists.data:
-            flash("Username already taken.", "danger")
+        user, err = _do_register(
+            request.form.get("username", "").strip(),
+            request.form.get("password", ""),
+            request.form.get("birthday", ""),
+        )
+        if err:
+            flash(err, "danger")
             return redirect(url_for("register"))
-
-        hashed = generate_password_hash(password)
-        now = datetime.datetime.utcnow().isoformat()
-        result = supabase.table("users").insert({
-            "username": username,
-            "password": hashed,
-            "birthday": birthday,
-            "picture_credits": 5,
-            "video_credits": 2,
-            "images_today": 0,
-            "videos_today": 0,
-            "last_reset": now,
-            "api_key1": str(uuid.uuid4()),
-            "api_key2": str(uuid.uuid4()),
-        }).select().execute()
-
-        user = User(result.data[0])
         login_user(user)
-        flash("Account created! You have 5 free image credits and 2 video credits.", "success")
-        return redirect(url_for("dashboard"))
-
+        return redirect(url_for("percfectstudios"))
     return render_template("register.html")
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "")
-        res = supabase.table("users").select("*").eq("username", username).single().execute()
-        if res.data and check_password_hash(res.data["password"], password):
-            user = User(res.data)
+        user, err = _do_login(
+            request.form.get("username", "").strip(),
+            request.form.get("password", ""),
+        )
+        if err:
+            flash(err, "danger")
+        else:
             login_user(user)
-            return redirect(url_for("dashboard"))
-        flash("Invalid credentials.", "danger")
-
+            return redirect(url_for("percfectstudios"))
     return render_template("login.html")
+
+
+@app.route("/auth/register", methods=["POST"])
+def auth_register_ajax():
+    data = request.get_json() or {}
+    user, err = _do_register(
+        data.get("username", "").strip(),
+        data.get("password", ""),
+        data.get("birthday", ""),
+    )
+    if err:
+        return jsonify({"error": err}), 400
+    login_user(user)
+    return jsonify({"ok": True, "username": user.username,
+                    "picture_credits": user.picture_credits,
+                    "video_credits": user.video_credits})
+
+
+@app.route("/auth/login", methods=["POST"])
+def auth_login_ajax():
+    data = request.get_json() or {}
+    user, err = _do_login(
+        data.get("username", "").strip(),
+        data.get("password", ""),
+    )
+    if err:
+        return jsonify({"error": err}), 401
+    login_user(user)
+    return jsonify({"ok": True, "username": user.username,
+                    "picture_credits": user.picture_credits,
+                    "video_credits": user.video_credits})
 
 
 @app.route("/logout")
@@ -197,11 +237,13 @@ def dashboard():
 
 # ── PercfectStudios ───────────────────────────────────────
 @app.route("/percfectstudios")
-@login_required
 def percfectstudios():
-    reset_daily_if_needed(current_user.id)
-    res = supabase.table("users").select("picture_credits,video_credits,images_today,videos_today").eq("id", current_user.id).single().execute()
-    return render_template("percfectstudios.html", user=res.data)
+    user_data = None
+    if current_user.is_authenticated:
+        reset_daily_if_needed(current_user.id)
+        res = supabase.table("users").select("picture_credits,video_credits,images_today,videos_today").eq("id", current_user.id).single().execute()
+        user_data = res.data
+    return render_template("percfectstudios.html", user=user_data)
 
 
 @app.route("/percfectstudios/generate-image", methods=["POST"])
