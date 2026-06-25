@@ -4,58 +4,57 @@ import xbmcgui
 import xbmcplugin
 import xbmcaddon
 import urllib.parse
+import urllib.request
+import urllib.error
 import json
-import requests
 import time
 import random
 import string
 
-ADDON     = xbmcaddon.Addon()
-ADDON_ID  = ADDON.getAddonInfo('id')
-BASE_URL  = 'https://percfectstudios.onrender.com'
-HANDLE    = int(sys.argv[1]) if len(sys.argv) > 1 else 0
+ADDON = xbmcaddon.Addon()
+ADDON_ID = ADDON.getAddonInfo('id')
+BASE_URL = 'https://percfectai.com'
+HANDLE = int(sys.argv[1]) if len(sys.argv) > 1 else 0
 
-# ── Settings helpers ──────────────────────────────────────
 
 def get_api_key():
     return ADDON.getSetting('api_key')
 
+
 def set_api_key(key):
     ADDON.setSetting('api_key', key)
+
 
 def get_username():
     return ADDON.getSetting('username')
 
+
 def set_username(name):
     ADDON.setSetting('username', name)
 
-# ── API helpers ───────────────────────────────────────────
 
-def api_headers():
-    return {'X-API-Key': get_api_key(), 'Content-Type': 'application/json'}
+def api_request(method, path, data=None, timeout=30):
+    headers = {'Content-Type': 'application/json'}
+    key = get_api_key()
+    if key:
+        headers['X-API-Key'] = key
+    body = json.dumps(data).encode() if data is not None else None
+    req = urllib.request.Request(f'{BASE_URL}{path}', data=body, headers=headers, method=method)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode())
+
 
 def get_credits():
     try:
-        r = requests.get(f'{BASE_URL}/api/kodi/credits', headers=api_headers(), timeout=8)
-        if r.ok:
-            return r.json()
+        return api_request('GET', '/api/kodi/credits', timeout=8)
     except Exception:
-        pass
-    return {'image_credits': 0, 'video_credits': 0}
+        return {'image_credits': 0, 'video_credits': 0}
 
-# ── Activation flow ───────────────────────────────────────
 
 def activate():
-    """Generate a device code, show QR + PIN prompt, poll until phone activates."""
     device_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
     activate_url = f'{BASE_URL}/kodi-activate?device={device_code}'
-
-    # Show QR code dialog
     dialog = xbmcgui.Dialog()
-
-    # We show the URL in a progress dialog while polling
-    # Kodi doesn't have native QR rendering, so we display the URL
-    # and a message to scan with phone camera
     progress = xbmcgui.DialogProgress()
     progress.create(
         'PercfectStudios — Connect your TV',
@@ -63,42 +62,33 @@ def activate():
         f'  [B]{activate_url}[/B]\n\n'
         'Waiting for you to sign up on your phone...'
     )
-
-    # Show QR via a background image (generated server-side)
     qr_image_url = f'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={urllib.parse.quote(activate_url)}'
     xbmc.executebuiltin(f'ShowPicture({qr_image_url})')
 
-    # Poll for activation
-    for i in range(200):  # poll for up to ~10 min
+    for i in range(200):
         if progress.iscanceled():
             progress.close()
             xbmc.executebuiltin('Action(Back)')
             return False
-
         time.sleep(3)
-        percent = int((i / 200) * 100)
-        progress.update(percent)
-
+        progress.update(int((i / 200) * 100))
         try:
-            r = requests.get(f'{BASE_URL}/api/kodi/poll/{device_code}', timeout=5)
-            if r.ok:
-                data = r.json()
-                status = data.get('status')
-                if status == 'activated':
-                    progress.close()
-                    set_api_key(data['api_key'])
-                    set_username(data.get('username', ''))
-                    xbmcgui.Dialog().ok(
-                        'Connected!',
-                        f'Welcome, [B]{data.get("username")}[/B]!\n\n'
-                        f'[B]{data.get("image_credits", 0)}[/B] image credits\n'
-                        f'[B]{data.get("video_credits", 0)}s[/B] video time'
-                    )
-                    return True
-                elif status == 'expired':
-                    progress.close()
-                    dialog.ok('Code Expired', 'Your QR code expired. Please try again.')
-                    return False
+            data = api_request('GET', f'/api/kodi/poll/{device_code}', timeout=5)
+            if data.get('status') == 'activated':
+                progress.close()
+                set_api_key(data['api_key'])
+                set_username(data.get('username', ''))
+                xbmcgui.Dialog().ok(
+                    'Connected!',
+                    f'Welcome, [B]{data.get("username")}[/B]!\n\n'
+                    f'[B]{data.get("image_credits", 0)}[/B] image credits\n'
+                    f'[B]{data.get("video_credits", 0)}s[/B] video time'
+                )
+                return True
+            if data.get('status') == 'expired':
+                progress.close()
+                dialog.ok('Code Expired', 'Your QR code expired. Please try again.')
+                return False
         except Exception:
             pass
 
@@ -108,7 +98,6 @@ def activate():
 
 
 def verify_pin():
-    """Manual PIN entry — user scanned QR on phone, got a PIN, types it here."""
     dialog = xbmcgui.Dialog()
     device_code = dialog.input('Enter device code (shown on phone after scanning)', type=xbmcgui.INPUT_ALPHANUM)
     if not device_code:
@@ -116,181 +105,138 @@ def verify_pin():
     pin = dialog.input('Enter your 6-digit PIN', type=xbmcgui.INPUT_NUMERIC)
     if not pin:
         return False
-
     try:
-        r = requests.post(f'{BASE_URL}/api/kodi/verify',
-                          json={'device_code': device_code, 'pin': pin},
-                          timeout=10)
-        if r.ok:
-            data = r.json()
-            set_api_key(data['api_key'])
-            set_username(data.get('username', ''))
-            dialog.ok('Connected!',
-                       f'Welcome, [B]{data.get("username")}[/B]!\n\n'
-                       f'[B]{data.get("image_credits", 0)}[/B] image credits\n'
-                       f'[B]{data.get("video_credits", 0)}s[/B] video time')
-            return True
-        else:
-            dialog.ok('Error', r.json().get('error', 'Authentication failed.'))
+        data = api_request('POST', '/api/kodi/verify', {'device_code': device_code, 'pin': pin})
+        set_api_key(data['api_key'])
+        set_username(data.get('username', ''))
+        dialog.ok('Connected!',
+                  f'Welcome, [B]{data.get("username")}[/B]!\n\n'
+                  f'[B]{data.get("image_credits", 0)}[/B] image credits\n'
+                  f'[B]{data.get("video_credits", 0)}s[/B] video time')
+        return True
+    except urllib.error.HTTPError as e:
+        try:
+            err = json.loads(e.read().decode()).get('error', 'Authentication failed.')
+        except Exception:
+            err = 'Authentication failed.'
+        dialog.ok('Error', err)
     except Exception as e:
         dialog.ok('Error', str(e))
     return False
 
-# ── Credit display ────────────────────────────────────────
 
 def credits_header(credits):
-    img_c = credits.get('image_credits', 0)
-    vid_c = credits.get('video_credits', 0)
-    return f'[B]{img_c}[/B] images · [B]{vid_c}s[/B] video'
+    return f'[B]{credits.get("image_credits", 0)}[/B] images · [B]{credits.get("video_credits", 0)}s[/B] video'
 
-# ── Generate image ────────────────────────────────────────
 
 def generate_image():
     credits = get_credits()
     if credits.get('image_credits', 0) <= 0:
         show_buy_credits('You have no image credits left.')
         return
-
     dialog = xbmcgui.Dialog()
     prompt = dialog.input('Describe your image', type=xbmcgui.INPUT_ALPHANUM)
     if not prompt:
         return
-
     progress = xbmcgui.DialogProgress()
     progress.create('PercfectStudios', 'Generating your image...')
     progress.update(20)
-
     try:
-        r = requests.post(f'{BASE_URL}/api/generate/image',
-                          json={'prompt': prompt},
-                          headers=api_headers(), timeout=60)
+        data = api_request('POST', '/api/generate/image', {'prompt': prompt}, timeout=90)
         progress.update(90)
-        if r.ok:
-            url = r.json().get('url')
-            progress.close()
-            if url:
-                xbmc.executebuiltin(f'ShowPicture({url})')
+        progress.close()
+        url = data.get('url')
+        if url:
+            xbmc.executebuiltin(f'ShowPicture({url})')
+    except urllib.error.HTTPError as e:
+        progress.close()
+        try:
+            err = json.loads(e.read().decode()).get('error', 'Generation failed.')
+        except Exception:
+            err = 'Generation failed.'
+        if e.code == 402 or 'credit' in err.lower():
+            show_buy_credits(err)
         else:
-            progress.close()
-            err = r.json().get('error', 'Generation failed.')
-            if '402' in str(r.status_code) or 'credit' in err.lower():
-                show_buy_credits(err)
-            else:
-                dialog.ok('Error', err)
+            dialog.ok('Error', err)
     except Exception as e:
         progress.close()
         dialog.ok('Error', str(e))
 
-# ── Generate video ────────────────────────────────────────
 
 def generate_video():
     credits = get_credits()
     vid_c = credits.get('video_credits', 0)
-
     if vid_c <= 0:
         show_buy_credits('You have no video seconds left.')
         return
-
     dialog = xbmcgui.Dialog()
-
-    # Duration picker
     durations = ['5 seconds', '6 seconds', '10 seconds', '15 seconds']
-    dur_secs  = [5, 6, 10, 15]
+    dur_secs = [5, 6, 10, 15]
     idx = dialog.select(f'Video length ({vid_c}s available)', durations)
     if idx < 0:
         return
     duration = dur_secs[idx]
-
     if vid_c < duration:
         show_buy_credits(f'You need {duration}s but only have {vid_c}s.\nBuy more credits to continue.')
         return
-
     prompt = dialog.input('Describe your video', type=xbmcgui.INPUT_ALPHANUM)
     if not prompt:
         return
-
     progress = xbmcgui.DialogProgress()
     progress.create('PercfectStudios', f'Generating {duration}s video...\nThis takes about 60–120 seconds.')
-
-    # Animate progress while waiting
     for pct in range(10, 85, 3):
         if progress.iscanceled():
             progress.close()
             return
         time.sleep(2)
         progress.update(pct, f'Generating {duration}s video... {pct}%')
-
     try:
-        r = requests.post(f'{BASE_URL}/api/generate/video',
-                          json={'prompt': prompt, 'duration': duration},
-                          headers=api_headers(), timeout=180)
+        data = api_request('POST', '/api/generate/video', {'prompt': prompt, 'duration': duration}, timeout=200)
         progress.update(95)
-        if r.ok:
-            url = r.json().get('url')
-            progress.close()
-            if url:
-                li = xbmcgui.ListItem(prompt, path=url)
-                li.setInfo('video', {'title': prompt})
-                xbmc.Player().play(url, li)
+        progress.close()
+        url = data.get('url')
+        if url:
+            li = xbmcgui.ListItem(prompt, path=url)
+            li.setInfo('video', {'title': prompt})
+            xbmc.Player().play(url, li)
+    except urllib.error.HTTPError as e:
+        progress.close()
+        try:
+            err = json.loads(e.read().decode()).get('error', 'Generation failed.')
+        except Exception:
+            err = 'Generation failed.'
+        if e.code == 402 or 'credit' in err.lower():
+            show_buy_credits(err)
         else:
-            progress.close()
-            err = r.json().get('error', 'Generation failed.')
-            if '402' in str(r.status_code) or 'credit' in err.lower():
-                show_buy_credits(err)
-            else:
-                dialog.ok('Error', err)
+            dialog.ok('Error', err)
     except Exception as e:
         progress.close()
         dialog.ok('Error', str(e))
 
-# ── Buy credits ───────────────────────────────────────────
 
 def show_buy_credits(message=''):
     dialog = xbmcgui.Dialog()
     buy_url = f'{BASE_URL}/buy-credits'
-    qr_url  = f'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={urllib.parse.quote(buy_url)}'
-
-    choice = dialog.select(
-        'Get More Credits',
-        [
-            '📱 Scan QR code with your phone (fastest)',
-            f'⌨  Type this URL: percfectstudios.onrender.com/buy-credits',
-        ]
-    )
+    qr_url = f'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={urllib.parse.quote(buy_url)}'
+    choice = dialog.select('Get More Credits', [
+        'Scan QR code with your phone (fastest)',
+        'Type this URL: percfectai.com/buy-credits',
+    ])
     if choice == 0:
-        # Show QR code
         xbmc.executebuiltin(f'ShowPicture({qr_url})')
-        dialog.ok(
-            'Scan to Buy Credits',
-            f'{message}\n\n'
-            'Scan the QR code on screen with your phone to buy credits.\n'
-            'Your balance updates automatically!'
-        )
+        dialog.ok('Scan to Buy Credits', f'{message}\n\nScan the QR code on screen with your phone.')
     elif choice == 1:
-        dialog.ok(
-            'Buy Credits',
-            f'{message}\n\n'
-            'On your phone or computer, go to:\n\n'
-            '[B]percfectstudios.onrender.com/buy-credits[/B]\n\n'
-            'Your credit balance updates automatically after payment.'
-        )
+        dialog.ok('Buy Credits', f'{message}\n\nGo to:\n\n[B]percfectai.com/buy-credits[/B]')
 
-# ── Gallery ───────────────────────────────────────────────
 
 def show_gallery():
     try:
-        r = requests.get(f'{BASE_URL}/api/gallery', headers=api_headers(), timeout=10)
-        if not r.ok:
-            xbmcgui.Dialog().ok('Error', 'Could not load gallery.')
-            return
-        items = r.json()
+        items = api_request('GET', '/api/gallery', timeout=15)
     except Exception as e:
         xbmcgui.Dialog().ok('Error', str(e))
         return
-
     xbmcplugin.setPluginCategory(HANDLE, 'My Generations')
     xbmcplugin.setContent(HANDLE, 'videos')
-
     for item in items:
         url = item.get('output_url', '')
         kind = item.get('type', 'image')
@@ -300,64 +246,43 @@ def show_gallery():
         li.setInfo('video', {'title': prompt, 'mediatype': 'video'})
         li.setProperty('IsPlayable', 'true')
         xbmcplugin.addDirectoryItem(HANDLE, url, li, False)
-
     xbmcplugin.endOfDirectory(HANDLE)
 
-# ── Main menu ─────────────────────────────────────────────
 
 def main_menu():
     api_key = get_api_key()
-
     if not api_key:
-        # Not authenticated
         dialog = xbmcgui.Dialog()
-        choice = dialog.select(
-            'Welcome to PercfectStudios',
-            [
-                '📱 Scan QR code to sign up / log in (recommended)',
-                '⌨  Enter PIN manually (already scanned on phone)',
-            ]
-        )
-        if choice == 0:
-            if activate():
-                xbmc.executebuiltin('Container.Refresh')
-        elif choice == 1:
-            if verify_pin():
-                xbmc.executebuiltin('Container.Refresh')
+        choice = dialog.select('Welcome to PercfectStudios', [
+            'Scan QR code to sign up / log in (recommended)',
+            'Enter PIN manually (already scanned on phone)',
+        ])
+        if choice == 0 and activate():
+            xbmc.executebuiltin('Container.Refresh')
+        elif choice == 1 and verify_pin():
+            xbmc.executebuiltin('Container.Refresh')
         return
 
-    # Authenticated — show menu with live credits
     credits = get_credits()
-    header = credits_header(credits)
-    username = get_username() or 'You'
-
-    xbmcplugin.setPluginCategory(HANDLE, f'PercfectStudios — {header}')
+    xbmcplugin.setPluginCategory(HANDLE, f'PercfectStudios — {credits_header(credits)}')
     xbmcplugin.setContent(HANDLE, 'videos')
-
-    items = [
-        ('🖼  Generate Image',  'generate_image'),
-        ('🎬  Generate Video',  'generate_video'),
-        ('📁  My Gallery',      'gallery'),
-        ('💳  Buy Credits',     'buy_credits'),
-        ('🔄  Refresh Credits', 'refresh'),
-        ('🔓  Disconnect',      'disconnect'),
-    ]
-
-    for label, action in items:
+    for label, action in [
+        ('Generate Image', 'generate_image'),
+        ('Generate Video', 'generate_video'),
+        ('My Gallery', 'gallery'),
+        ('Buy Credits', 'buy_credits'),
+        ('Refresh Credits', 'refresh'),
+        ('Disconnect', 'disconnect'),
+    ]:
         li = xbmcgui.ListItem(label=label)
         li.setProperty('IsPlayable', 'false')
-        url = f'plugin://{ADDON_ID}/?action={action}'
-        xbmcplugin.addDirectoryItem(HANDLE, url, li, True)
-
+        xbmcplugin.addDirectoryItem(HANDLE, f'plugin://{ADDON_ID}/?action={action}', li, True)
     xbmcplugin.endOfDirectory(HANDLE)
 
-
-# ── Router ────────────────────────────────────────────────
 
 params = {}
 if len(sys.argv) > 2 and sys.argv[2]:
     params = dict(urllib.parse.parse_qsl(sys.argv[2].lstrip('?')))
-
 action = params.get('action', '')
 
 if action == 'generate_image':

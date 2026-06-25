@@ -110,7 +110,7 @@ def generate_video_xai(prompt: str, image_url: str = None, duration: int = 6) ->
     }
     payload = {"model": "grok-imagine-video", "prompt": prompt, "duration": duration}
     if image_url:
-        payload["image_url"] = image_url
+        payload["image"] = {"url": image_url}
 
     # Submit job
     resp = requests.post(f"{XAI_BASE_URL}/videos/generations", json=payload, headers=headers, timeout=30)
@@ -489,8 +489,10 @@ def stripe_webhook():
 
 
 # ── Kodi page ─────────────────────────────────────────────
-@app.route("/kodi")
+@app.route("/kodi-setup")
+@app.route("/kodi-page")
 def kodi():
+    """Kodi install guide — use /kodi-setup on Vercel; /kodi serves repo zip."""
     api_key = None
     if current_user.is_authenticated:
         res = supabase.table("users").select("api_key1").eq("id", current_user.id).single().execute()
@@ -558,17 +560,21 @@ def api_generate_video():
     body = request.get_json(silent=True) or {}
     prompt = body.get("prompt", "").strip()
     image_url = body.get("image_url", "").strip() or None
+    duration = int(body.get("duration", 6))
+    duration = max(5, min(15, duration))
     if not prompt:
         return jsonify({"error": "prompt is required"}), 400
+    if user["video_credits"] < duration:
+        return jsonify({"error": f"Not enough video seconds. You have {user['video_credits']}s remaining."}), 402
 
     try:
-        result = generate_video_xai(prompt, image_url)
+        result = generate_video_xai(prompt, image_url, duration)
         video_url = (result.get("video") or {}).get("url") \
             or result.get("url") \
             or (result.get("data") or [{}])[0].get("url")
 
         supabase.table("users").update({
-            "video_credits": user["video_credits"] - 1,
+            "video_credits": user["video_credits"] - duration,
             "videos_today": user["videos_today"] + 1,
         }).eq("id", user["id"]).execute()
 

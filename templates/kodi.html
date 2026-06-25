@@ -11,9 +11,8 @@
     <p class="kodi-subtitle">Generate AI images &amp; videos directly on your TV.<br>Powered by xAI Aurora — available as a Kodi add-on.</p>
 
     <div class="kodi-actions">
-      <a href="/static/kodi/plugin.video.percfectstudios-1.0.0.zip"
-         download class="btn btn-accent btn-lg px-5 py-3">
-        ⬇ Download Add-on v1.0.0
+      <a href="https://percfectai.com/kodi" class="btn btn-accent btn-lg px-5 py-3">
+        ⬇ Install URL (type in Kodi)
       </a>
       <a href="/percfectstudios" class="btn btn-outline-accent btn-lg px-5 py-3">
         🌐 Use in Browser
@@ -87,7 +86,7 @@
           <div class="step-num">03</div>
           <div>
             <strong>Open Kodi → Add-ons</strong>
-            <p>Launch Kodi, go to Add-ons → click the box icon (top left) → Install from zip file.</p>
+            <p>Launch Kodi, go to Add-ons → click the box icon (top left).</p>
           </div>
         </div>
       </div>
@@ -96,9 +95,9 @@
         <div class="install-step">
           <div class="step-num">04</div>
           <div>
-            <strong>Enter the download URL</strong>
-            <p>When prompted for a source, type in:</p>
-            <div class="url-chip">percfectai.com/static/kodi/plugin.video.percfectstudios-1.0.0.zip</div>
+            <strong>Install from zip file</strong>
+            <p>Type this URL (include https://):</p>
+            <div class="url-chip">https://percfectai.com/kodi</div>
           </div>
         </div>
       </div>
@@ -107,8 +106,8 @@
         <div class="install-step">
           <div class="step-num">05</div>
           <div>
-            <strong>Enter your API Key</strong>
-            <p>After installing, open the add-on settings and paste your API key below.</p>
+            <strong>Install from zip folder</strong>
+            <p>If you used the Downloader app instead, go to Install from zip file → Downloads → select the repo zip.</p>
           </div>
         </div>
       </div>
@@ -117,8 +116,28 @@
         <div class="install-step">
           <div class="step-num">06</div>
           <div>
-            <strong>Start Generating</strong>
-            <p>Open PercfectStudios from your Kodi Add-ons menu and start creating on your TV.</p>
+            <strong>PercfectAI Repository installs</strong>
+            <p>Wait for the repository to finish installing. It appears under Install from repository.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="install-step">
+          <div class="step-num">07</div>
+          <div>
+            <strong>Install from repository</strong>
+            <p>Add-ons → box icon → Install from repository → PercfectAI Repository → Video add-ons → PercfectStudios → Install.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="install-step">
+          <div class="step-num">08</div>
+          <div>
+            <strong>Connect your TV</strong>
+            <p>Open PercfectStudios → Scan QR code with your phone to sign up free. API key below is optional fallback.</p>
           </div>
         </div>
       </div>
@@ -129,7 +148,7 @@
   <!-- API Key section -->
   <div class="kodi-section mb-5">
     <h2 class="kodi-section-title">Your API Key</h2>
-    <p style="color:var(--text-muted);margin-top:0.5rem 0 1.5rem;">Paste this into the add-on settings (Add-ons → PercfectStudios → Configure)</p>
+    <p style="color:var(--text-muted);margin-top:0.5rem 0 1.5rem;">Optional fallback — paste into add-on settings if QR login does not work</p>
 
     {% if api_key %}
     <div class="api-key-display mt-3">
@@ -151,11 +170,8 @@
   <!-- Download CTA -->
   <div class="kodi-cta mb-5">
     <h3>Ready to generate on your TV?</h3>
-    <p>Download the add-on, install it in Kodi, paste your key — you're live.</p>
-    <a href="/static/kodi/plugin.video.percfectstudios-1.0.0.zip"
-       download class="btn btn-accent btn-lg px-5 py-3 mt-2">
-      ⬇ Download PercfectStudios for Kodi
-    </a>
+    <p>Install via Kodi using the short URL above, then scan the QR code in the add-on.</p>
+    <div class="url-chip" style="display:inline-block;margin-top:0.5rem;">https://percfectai.com/kodi</div>
   </div>
 
 </div>
