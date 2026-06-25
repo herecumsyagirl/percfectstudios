@@ -329,7 +329,7 @@ def dashboard():
 @app.route("/settings", methods=["GET", "POST"])
 @login_required
 def account_settings():
-    res = supabase.table("users").select("username,email,birthday").eq("id", current_user.id).single().execute()
+    res = supabase.table("users").select("username,email,birthday,picture_credits,video_credits,images_today,videos_today,created_at").eq("id", current_user.id).single().execute()
     user_data = res.data
     success = None
     error = None

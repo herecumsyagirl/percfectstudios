@@ -1,9 +1,65 @@
 {% extends "base.html" %}
 {% block title %}Account Settings · PercfectAI{% endblock %}
 {% block content %}
-<div class="container py-5" style="max-width:560px;">
+<style>
+  .settings-wrap { max-width: 620px; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
+  .settings-wrap h2 { font-weight: 800; letter-spacing: -0.02em; margin-bottom: 2rem; }
+  .settings-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border-2);
+    border-radius: 16px;
+    padding: 1.75rem;
+    margin-bottom: 1.25rem;
+  }
+  .settings-section-title {
+    font-weight: 700; font-size: 0.9rem; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--text-muted); margin-bottom: 1.25rem;
+  }
+  .form-label-sm {
+    display: block; font-size: 0.8rem; font-weight: 600;
+    color: var(--text-muted); margin-bottom: 0.4rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .form-control-dark {
+    background: var(--surface-1); border: 1px solid var(--border-2);
+    color: var(--text); border-radius: 10px; padding: 0.6rem 0.9rem;
+    width: 100%; font-size: 0.9rem; transition: border-color 0.2s;
+  }
+  .form-control-dark:focus {
+    outline: none; border-color: var(--purple); background: var(--surface-1);
+    color: var(--text); box-shadow: 0 0 0 3px rgba(124,92,252,0.15);
+  }
+  .form-control-dark:disabled { opacity: 0.45; cursor: not-allowed; }
+  .alert-success-bar {
+    background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3);
+    color: #4ade80; border-radius: 10px; padding: 0.75rem 1rem;
+    margin-bottom: 1.25rem; font-size: 0.9rem;
+  }
+  .alert-error-bar {
+    background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3);
+    color: #f87171; border-radius: 10px; padding: 0.75rem 1rem;
+    margin-bottom: 1.25rem; font-size: 0.9rem;
+  }
+  .credit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem; }
+  .credit-box {
+    background: var(--surface-1); border: 1px solid var(--border-2);
+    border-radius: 12px; padding: 1rem; text-align: center;
+  }
+  .credit-box .cval { font-size: 2rem; font-weight: 800; color: var(--purple-light); line-height: 1; }
+  .credit-box .clabel { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  .support-link {
+    display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1rem;
+    border: 1px solid var(--border-2); border-radius: 12px;
+    color: var(--text); text-decoration: none; font-size: 0.9rem;
+    transition: border-color 0.2s, background 0.2s; margin-bottom: 0.5rem;
+  }
+  .support-link:hover { border-color: var(--purple); background: rgba(124,92,252,0.06); color: var(--text); }
+  .support-link .sicon { font-size: 1.2rem; width: 28px; text-align: center; }
+  .support-link small { display: block; color: var(--text-muted); font-size: 0.75rem; }
+</style>
 
-  <h2 style="font-weight:700;letter-spacing:-0.02em;margin-bottom:2rem;">Account Settings</h2>
+<div class="settings-wrap">
+  <h2>Account Settings</h2>
 
   {% if success %}
   <div class="alert-success-bar">{{ success }}</div>
@@ -12,119 +68,95 @@
   <div class="alert-error-bar">{{ error }}</div>
   {% endif %}
 
+  <!-- Credits -->
+  <div class="settings-card">
+    <div class="settings-section-title">Your Credits</div>
+    <div class="credit-grid">
+      <div class="credit-box">
+        <div class="cval">{{ user.picture_credits or 0 }}</div>
+        <div class="clabel">Image Credits</div>
+      </div>
+      <div class="credit-box">
+        <div class="cval">{{ user.video_credits or 0 }}</div>
+        <div class="clabel">Video Credits</div>
+      </div>
+    </div>
+    <a href="/buy-credits" class="btn btn-accent w-100">Buy More Credits</a>
+  </div>
+
   <!-- Profile -->
-  <div class="settings-card mb-4">
-    <h5 class="settings-section-title">Profile</h5>
+  <div class="settings-card">
+    <div class="settings-section-title">Profile</div>
     <form method="POST">
       <input type="hidden" name="action" value="profile">
-
       <div class="mb-3">
         <label class="form-label-sm">Username</label>
-        <input type="text" class="form-control form-control-dark" value="{{ user.username }}" disabled>
-        <small class="text-muted">Username cannot be changed.</small>
+        <input type="text" class="form-control-dark" value="{{ user.username }}" disabled>
+        <small style="color:var(--text-muted);font-size:0.75rem;">Cannot be changed.</small>
       </div>
-
       <div class="mb-3">
         <label class="form-label-sm">Email</label>
-        <input type="email" name="email" class="form-control form-control-dark" value="{{ user.email or '' }}" placeholder="your@email.com">
+        <input type="email" name="email" class="form-control-dark" value="{{ user.email or '' }}" placeholder="your@email.com">
       </div>
-
       <div class="mb-4">
         <label class="form-label-sm">Date of Birth</label>
-        <input type="date" name="birthday" class="form-control form-control-dark" value="{{ user.birthday or '' }}">
-        <small class="text-muted">Required to access age-restricted content.</small>
+        <input type="date" name="birthday" class="form-control-dark" value="{{ user.birthday or '' }}">
+        <small style="color:var(--text-muted);font-size:0.75rem;">Required for age-restricted content.</small>
       </div>
-
       <button type="submit" class="btn btn-accent w-100">Save Profile</button>
     </form>
   </div>
 
   <!-- Password -->
   <div class="settings-card">
-    <h5 class="settings-section-title">Change Password</h5>
+    <div class="settings-section-title">Change Password</div>
     <form method="POST">
       <input type="hidden" name="action" value="password">
-
       <div class="mb-3">
         <label class="form-label-sm">Current Password</label>
-        <input type="password" name="current_password" class="form-control form-control-dark" placeholder="••••••••" required>
+        <input type="password" name="current_password" class="form-control-dark" placeholder="••••••••" required>
       </div>
-
       <div class="mb-3">
         <label class="form-label-sm">New Password</label>
-        <input type="password" name="new_password" class="form-control form-control-dark" placeholder="••••••••" required>
+        <input type="password" name="new_password" class="form-control-dark" placeholder="••••••••" required>
       </div>
-
       <div class="mb-4">
         <label class="form-label-sm">Confirm New Password</label>
-        <input type="password" name="confirm_password" class="form-control form-control-dark" placeholder="••••••••" required>
+        <input type="password" name="confirm_password" class="form-control-dark" placeholder="••••••••" required>
       </div>
-
       <button type="submit" class="btn btn-accent w-100">Update Password</button>
     </form>
   </div>
 
-</div>
+  <!-- Support -->
+  <div class="settings-card">
+    <div class="settings-section-title">Support</div>
+    <a href="mailto:support@percfectai.com" class="support-link">
+      <span class="sicon">✉️</span>
+      <div>
+        Email Support
+        <small>support@percfectai.com — we reply within 24h</small>
+      </div>
+    </a>
+    <a href="/percfectstudios" class="support-link">
+      <span class="sicon">⬡</span>
+      <div>
+        Go to Studio
+        <small>Generate images & videos</small>
+      </div>
+    </a>
+    <a href="/percfectprincesses" class="support-link">
+      <span class="sicon">👑</span>
+      <div>
+        Percfect Princesses
+        <small>Free AI princess generator</small>
+      </div>
+    </a>
+  </div>
 
-<style>
-  .settings-card {
-    background: var(--surface-2);
-    border: 1px solid var(--border-2);
-    border-radius: 16px;
-    padding: 1.75rem;
-  }
-  .settings-section-title {
-    font-weight: 700;
-    font-size: 1rem;
-    margin-bottom: 1.25rem;
-    color: var(--text);
-  }
-  .form-label-sm {
-    display: block;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    margin-bottom: 0.4rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .form-control-dark {
-    background: var(--surface-1);
-    border: 1px solid var(--border-2);
-    color: var(--text);
-    border-radius: 10px;
-    padding: 0.6rem 0.9rem;
-    width: 100%;
-    font-size: 0.9rem;
-  }
-  .form-control-dark:focus {
-    outline: none;
-    border-color: var(--purple);
-    background: var(--surface-1);
-    color: var(--text);
-    box-shadow: 0 0 0 3px rgba(124,92,252,0.15);
-  }
-  .form-control-dark:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
-  .alert-success-bar {
-    background: rgba(34,197,94,0.12);
-    border: 1px solid rgba(34,197,94,0.3);
-    color: #4ade80;
-    border-radius: 10px;
-    padding: 0.75rem 1rem;
-    margin-bottom: 1.25rem;
-    font-size: 0.9rem;
-  }
-  .alert-error-bar {
-    background: rgba(239,68,68,0.12);
-    border: 1px solid rgba(239,68,68,0.3);
-    color: #f87171;
-    border-radius: 10px;
-    padding: 0.75rem 1rem;
-    margin-bottom: 1.25rem;
-    font-size: 0.9rem;
-  }
-</style>
+  <!-- Danger zone -->
+  <div style="text-align:center;margin-top:1.5rem;">
+    <a href="/logout" style="color:var(--text-muted);font-size:0.85rem;text-decoration:none;">Log out</a>
+  </div>
+</div>
 {% endblock %}
