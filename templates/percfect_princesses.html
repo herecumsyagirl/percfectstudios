@@ -6,7 +6,7 @@
 <style>
   .pp-hero {
     text-align: center;
-    padding: 2.5rem 1rem 1.5rem;
+    padding: 2rem 1rem 1rem;
   }
   .pp-hero h1 {
     font-size: 2rem;
@@ -15,185 +15,263 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.35rem;
   }
-  .pp-hero p {
-    color: var(--text-muted);
-    font-size: 0.95rem;
-    max-width: 520px;
-    margin: 0 auto;
-  }
-  .pp-launch {
-    width: 100%;
-    max-width: 720px;
-    margin: 0 auto;
-    padding: 0 1rem 1rem;
-  }
-  .pp-launch-card {
-    background: linear-gradient(160deg, rgba(124,92,252,0.14), rgba(224,64,251,0.08));
-    border: 1px solid rgba(124,92,252,0.35);
-    border-radius: 20px;
-    padding: 2.5rem 2rem;
-    text-align: center;
-  }
-  .pp-launch-icon {
-    font-size: 3.5rem;
-    line-height: 1;
-    margin-bottom: 1rem;
-  }
-  .pp-launch-card h2 {
-    font-size: 1.35rem;
-    font-weight: 800;
-    margin-bottom: 0.75rem;
-  }
-  .pp-launch-card p {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    max-width: 460px;
-    margin: 0 auto 1.5rem;
-    line-height: 1.6;
-  }
-  .pp-launch-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: var(--accent);
-    color: #fff;
-    padding: 0.85rem 2rem;
-    border-radius: 12px;
-    font-weight: 700;
-    font-size: 1rem;
-    text-decoration: none;
-    transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
-    box-shadow: 0 8px 32px rgba(124,92,252,0.35);
-  }
-  .pp-launch-btn:hover {
-    background: var(--accent-2);
-    transform: translateY(-2px);
-    color: #fff;
-    box-shadow: 0 12px 40px rgba(124,92,252,0.45);
-  }
-  .pp-features {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.75rem;
-    margin-top: 1.5rem;
-    text-align: left;
-  }
-  @media (max-width: 600px) {
-    .pp-features { grid-template-columns: 1fr; }
-  }
-  .pp-feature {
-    background: var(--bg-3);
+  .pp-hero p { color: var(--text-muted); font-size: 0.92rem; }
+  .pp-wrap { max-width: 720px; margin: 0 auto; padding: 0 1rem 2rem; }
+  .pp-panel {
+    background: var(--bg-2);
     border: 1px solid var(--border-2);
-    border-radius: 12px;
-    padding: 0.85rem 1rem;
-    font-size: 0.8rem;
-    color: var(--text-muted);
+    border-radius: 20px;
+    padding: 1.75rem;
   }
-  .pp-feature strong {
-    display: block;
-    color: var(--text);
-    font-size: 0.85rem;
-    margin-bottom: 0.2rem;
-  }
-  .pp-ad-banner {
-    max-width: 720px;
-    margin: 0 auto 1rem;
-    padding: 0 1rem;
-  }
-  .pp-ad-inner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    background: linear-gradient(135deg, rgba(124,92,252,0.18), rgba(224,64,251,0.12));
-    border: 1px solid rgba(124,92,252,0.35);
-    border-radius: 14px;
-    padding: 1rem 1.5rem;
-    flex-wrap: wrap;
-  }
-  .pp-ad-inner strong { color: var(--text); display: block; margin-top: 0.2rem; }
-  .pp-ad-badge {
+  .pp-label {
     font-size: 0.75rem;
     font-weight: 700;
-    background: var(--accent);
-    color: #fff;
-    padding: 0.15rem 0.6rem;
-    border-radius: 20px;
-    margin-right: 0.5rem;
-  }
-  .pp-ad-btn {
-    white-space: nowrap;
-    background: var(--accent);
-    color: #fff;
-    padding: 0.6rem 1.4rem;
-    border-radius: 10px;
-    font-weight: 600;
-    font-size: 0.875rem;
-    text-decoration: none;
-    transition: background 0.2s, transform 0.2s;
-  }
-  .pp-ad-btn:hover { background: var(--accent-2); transform: translateY(-1px); color: #fff; }
-  .pp-footer {
-    text-align: center;
-    padding: 1.25rem 1rem 2rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
     color: var(--text-muted);
-    font-size: 0.78rem;
+    margin-bottom: 0.5rem;
   }
-  .pp-footer a { color: var(--accent-2); text-decoration: none; }
+  .pp-select {
+    width: 100%;
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 0.65rem 0.9rem;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+  .pp-chips { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-bottom: 1rem; }
+  .pp-chip {
+    padding: 0.4rem 0.85rem;
+    border-radius: 99px;
+    border: 1px solid var(--border-2);
+    background: var(--bg-3);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .pp-chip.active, .pp-chip:hover {
+    border-color: var(--accent);
+    color: var(--text);
+    background: rgba(124,92,252,0.12);
+  }
+  .pp-output {
+    margin-top: 1.25rem;
+    border-radius: 16px;
+    border: 1px solid var(--border-2);
+    background: var(--bg-3);
+    min-height: 320px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .pp-output img { width: 100%; border-radius: 16px; display: block; }
+  .pp-placeholder { text-align: center; color: var(--text-muted); padding: 2rem; }
+  .pp-placeholder .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+  .pp-shimmer {
+    display: none;
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(124,92,252,0.08), transparent);
+    animation: pp-shine 1.4s infinite;
+  }
+  @keyframes pp-shine { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+  .pp-actions { display: flex; gap: 0.6rem; margin-top: 0.85rem; flex-wrap: wrap; }
+  .pp-limit {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.75rem;
+  }
+  .pp-limit strong { color: var(--accent-2); }
+  .pp-error {
+    display: none;
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    background: rgba(248,113,113,0.12);
+    border: 1px solid rgba(248,113,113,0.3);
+    color: var(--danger);
+    font-size: 0.85rem;
+  }
+  .pp-ad-banner { margin-top: 1.25rem; }
+  .pp-ad-inner {
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    background: linear-gradient(135deg, rgba(124,92,252,0.18), rgba(224,64,251,0.12));
+    border: 1px solid rgba(124,92,252,0.35);
+    border-radius: 14px; padding: 1rem 1.25rem; flex-wrap: wrap;
+  }
+  .pp-ad-badge {
+    font-size: 0.72rem; font-weight: 700; background: var(--accent);
+    color: #fff; padding: 0.15rem 0.55rem; border-radius: 20px; margin-right: 0.4rem;
+  }
+  .pp-alt-link {
+    display: block; text-align: center; margin-top: 1rem;
+    font-size: 0.78rem; color: var(--text-muted);
+  }
+  .pp-alt-link a { color: var(--accent-2); }
 </style>
 
 <div class="pp-hero">
   <h1>👑 Percfect Princesses</h1>
-  <p>Generate stunning AI princess characters — free, unlimited, no credits needed.</p>
+  <p>Pick a princess, choose a scene, generate — free, right here on the page.</p>
 </div>
 
-<div class="pp-launch">
-  <div class="pp-launch-card">
-    <div class="pp-launch-icon">✨</div>
-    <h2>Ready to create?</h2>
-    <p>
-      The generator runs on Perchance and opens in a new tab.
-      Pick a princess, customize the scene, and generate — completely free.
-    </p>
-    <a
-      href="https://perchance.org/9ujldjgr1f"
-      target="_blank"
-      rel="noopener noreferrer"
-      class="pp-launch-btn"
-    >
-      Launch Princess Generator →
-    </a>
-    <div class="pp-features">
-      <div class="pp-feature">
-        <strong>Free &amp; unlimited</strong>
-        No account or credits required
+<div class="pp-wrap">
+  <div class="pp-panel">
+    <div class="pp-label">Princess</div>
+    <select class="pp-select" id="pp-character">
+      {% for key, label in characters.items() %}
+      <option value="{{ key }}">{{ key|capitalize }}</option>
+      {% endfor %}
+    </select>
+
+    <div class="pp-label">Scene</div>
+    <select class="pp-select" id="pp-scene">
+      {% for key, label in scenes.items() %}
+      <option value="{{ key }}">{{ key|replace('_', ' ')|capitalize }}</option>
+      {% endfor %}
+    </select>
+
+    <div class="pp-label">Art Style</div>
+    <div class="pp-chips" id="pp-style-chips">
+      {% for key in styles %}
+      <span class="pp-chip{% if key == '3d' %} active{% endif %}" data-style="{{ key }}" onclick="pickStyle(this)">{{ key|upper if key == '3d' else key|capitalize }}</span>
+      {% endfor %}
+    </div>
+
+    <div class="pp-label">Extra details <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></div>
+    <textarea class="form-control" id="pp-prompt" rows="2"
+      placeholder="e.g. holding a glowing rose, soft smile, magical sparkles…"></textarea>
+
+    <button class="btn btn-accent w-100 mt-3" id="pp-btn" onclick="generatePrincess()">
+      <span id="pp-btn-text">✦ Generate Princess</span>
+      <span id="pp-btn-spin" style="display:none">Creating magic…</span>
+    </button>
+
+    {% if guest_remaining is not none %}
+    <div class="pp-limit" id="pp-limit">
+      <strong id="pp-remaining">{{ guest_remaining }}</strong> free generations left today
+      · <a href="#" onclick="openAuthModal('signup');return false;">Sign up</a> for unlimited
+    </div>
+    {% else %}
+    <div class="pp-limit">Unlimited princess generations · logged in as <strong>{{ current_user.username }}</strong></div>
+    {% endif %}
+
+    <div class="pp-output" id="pp-output">
+      <div class="pp-placeholder" id="pp-ph">
+        <div class="icon">👑</div>
+        <p>Your princess will appear here</p>
       </div>
-      <div class="pp-feature">
-        <strong>Disney-style princesses</strong>
-        Pick characters and scenes
+      <div class="pp-shimmer" id="pp-shimmer"></div>
+      <img id="pp-result" src="" alt="" style="display:none" />
+    </div>
+
+    <div class="pp-actions" id="pp-actions" style="display:none">
+      <a id="pp-download" href="#" download="percfect-princess.jpg" class="btn btn-outline-accent btn-sm">↓ Download</a>
+      <button onclick="sendToStudio()" class="btn btn-outline-accent btn-sm">▶ Animate in Studio</button>
+      <button onclick="generatePrincess()" class="btn btn-outline-accent btn-sm">↻ Generate another</button>
+    </div>
+
+    <div class="pp-error" id="pp-error"></div>
+  </div>
+
+  <div class="pp-ad-banner">
+    <div class="pp-ad-inner">
+      <div>
+        <span class="pp-ad-badge">✨ Want more?</span>
+        <strong>Turn your princess into a video</strong> — AI video generation with PercfectStudios.
       </div>
-      <div class="pp-feature">
-        <strong>Instant results</strong>
-        Images generate right on the page
-      </div>
+      <a href="/percfectstudios" class="btn btn-accent btn-sm">Try PercfectStudios →</a>
     </div>
   </div>
-</div>
 
-<div class="pp-ad-banner">
-  <div class="pp-ad-inner">
-    <div>
-      <span class="pp-ad-badge">✨ Want more?</span>
-      <strong>Turn your princess into a video</strong> — generate stunning AI videos with PercfectAI.
-    </div>
-    <a href="/percfectstudios" class="pp-ad-btn">Try PercfectStudios →</a>
-  </div>
+  <p class="pp-alt-link">
+    Also available on <a href="https://perchance.org/9ujldjgr1f" target="_blank" rel="noopener">Perchance</a>
+    (opens in new tab)
+  </p>
 </div>
+{% endblock %}
 
-<div class="pp-footer">
-  Powered by <a href="https://x.ai" target="_blank" rel="noopener">xAI</a> &middot;
-  <a href="https://perchance.org" target="_blank" rel="noopener">Perchance</a>
-</div>
+{% block scripts %}
+<script>
+let ppStyle = '3d';
+let lastImageUrl = '';
+
+function pickStyle(el) {
+  document.querySelectorAll('#pp-style-chips .pp-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  ppStyle = el.dataset.style;
+}
+
+function showError(msg, limitReached) {
+  const el = document.getElementById('pp-error');
+  el.style.display = 'block';
+  el.innerHTML = msg + (limitReached ? ' <a href="#" onclick="openAuthModal(\'signup\');return false;">Sign up free →</a>' : '');
+}
+
+async function generatePrincess() {
+  const btn = document.getElementById('pp-btn');
+  const btnText = document.getElementById('pp-btn-text');
+  const btnSpin = document.getElementById('pp-btn-spin');
+  const err = document.getElementById('pp-error');
+  const shimmer = document.getElementById('pp-shimmer');
+  const ph = document.getElementById('pp-ph');
+  const img = document.getElementById('pp-result');
+  const actions = document.getElementById('pp-actions');
+
+  err.style.display = 'none';
+  btn.disabled = true;
+  btnText.style.display = 'none';
+  btnSpin.style.display = '';
+  shimmer.style.display = 'block';
+  ph.style.display = 'none';
+  img.style.display = 'none';
+  actions.style.display = 'none';
+
+  const fd = new FormData();
+  fd.append('character', document.getElementById('pp-character').value);
+  fd.append('scene', document.getElementById('pp-scene').value);
+  fd.append('style', ppStyle);
+  fd.append('prompt', document.getElementById('pp-prompt').value.trim());
+
+  try {
+    const res = await fetch('/percfectprincesses/generate', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) {
+      showError(data.error || 'Generation failed.', data.limit_reached);
+      ph.style.display = '';
+      return;
+    }
+    lastImageUrl = data.url;
+    img.src = data.url;
+    img.style.display = 'block';
+    document.getElementById('pp-download').href = data.url;
+    actions.style.display = 'flex';
+    if (data.remaining !== null && data.remaining !== undefined) {
+      const rem = document.getElementById('pp-remaining');
+      if (rem) rem.textContent = data.remaining;
+    }
+  } catch (e) {
+    showError('Network error — please try again.');
+    ph.style.display = '';
+  } finally {
+    shimmer.style.display = 'none';
+    btn.disabled = false;
+    btnText.style.display = '';
+    btnSpin.style.display = 'none';
+  }
+}
+
+function sendToStudio() {
+  if (!lastImageUrl) return;
+  sessionStorage.setItem('studio_ref_image', lastImageUrl);
+  window.location.href = '/percfectstudios';
+}
+</script>
 {% endblock %}

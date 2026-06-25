@@ -26,6 +26,9 @@ alter table users add column if not exists signup_ip text;
 alter table users add column if not exists is_admin boolean default false;
 update users set is_adult = true where birthday is not null and birthday <> '' and birthday::date <= (current_date - interval '18 years');
 
+-- Allow guest princess generations in history (optional)
+alter table generations alter column user_id drop not null;
+
 create table if not exists generations (
   id          bigserial primary key,
   user_id     bigint references users(id) on delete cascade,

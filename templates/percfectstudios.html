@@ -547,5 +547,15 @@ async function loadGallery() {
   } catch(e) {}
 }
 loadGallery();
+
+/* Princess → Studio handoff */
+(function() {
+  const ref = sessionStorage.getItem('studio_ref_image');
+  if (!ref) return;
+  sessionStorage.removeItem('studio_ref_image');
+  document.getElementById('vid-image-url').value = ref;
+  document.getElementById('vid-prompt').value = 'The princess comes to life, gentle magical movement, cinematic';
+  document.getElementById('vid-panel').scrollIntoView({ behavior: 'smooth' });
+})();
 </script>
 {% endblock %}

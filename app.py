@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, g
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, g, session
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -20,6 +20,7 @@ app.config.update(
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
+    PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=30),
 )
 
 # Serve static files reliably under gunicorn
@@ -39,6 +40,37 @@ XAI_BASE_URL = "https://api.x.ai/v1"
 # ── Stripe ────────────────────────────────────────────────
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+
+GUEST_PRINCESS_DAILY_LIMIT = 5
+
+PRINCESS_CHARACTERS = {
+    "ariel": "Ariel-inspired mermaid princess, flowing vibrant red hair, seashell crown, ocean sparkle",
+    "belle": "Belle-inspired princess, golden ball gown, warm brown hair, elegant and bookish charm",
+    "jasmine": "Jasmine-inspired princess, teal outfit, long black hair, Arabian palace aesthetic",
+    "rapunzel": "Rapunzel-inspired princess, impossibly long golden braid, purple dress, lantern glow",
+    "elsa": "Elsa-inspired ice queen princess, shimmering blue gown, snowflake magic, platinum braid",
+    "aurora": "Aurora-inspired sleeping beauty princess, pink flowing gown, soft rose-gold hair",
+    "cinderella": "Cinderella-inspired princess, sparkling blue ball gown, glass slippers, midnight magic",
+    "moana": "Moana-inspired island princess, ocean waves, bold spirit, tropical flower accents",
+    "tiana": "Tiana-inspired princess, emerald green gown, New Orleans elegance, warm golden lighting",
+    "mulan": "Mulan-inspired warrior princess, crimson and gold, fierce grace, cherry blossom petals",
+}
+
+PRINCESS_SCENES = {
+    "castle": "inside a grand fairy tale castle ballroom with crystal chandeliers",
+    "forest": "enchanted forest clearing with glowing fireflies and magical mist",
+    "garden": "royal rose garden at golden hour with butterflies and soft petals",
+    "ocean": "moonlit ocean shore with bioluminescent waves and starry sky",
+    "ballroom": "lavish palace ballroom during a royal celebration",
+    "throne": "ornate throne room with stained glass windows and velvet banners",
+}
+
+PRINCESS_STYLES = {
+    "3d": "highly detailed 3D CGI render, cinematic volumetric lighting, ultra realistic skin texture, 8k masterpiece",
+    "anime": "anime illustration style, vibrant colors, clean linework, studio quality shading",
+    "fantasy": "epic fantasy art, painterly brushstrokes, dramatic rim lighting, storybook illustration",
+    "cinematic": "cinematic portrait photography, shallow depth of field, film grain, golden hour glow",
+}
 
 # Credit packages: price_id -> (image_credits, video_credits)
 CREDIT_PACKAGES = {
@@ -175,6 +207,18 @@ def generate_video_xai(prompt: str, image_url: str = None, duration: int = 6) ->
 
 
 # ── Auth Routes ───────────────────────────────────────────
+def _user_is_adult(birthday: str) -> bool:
+    if not birthday:
+        return False
+    try:
+        born = datetime.date.fromisoformat(birthday)
+        today = datetime.date.today()
+        age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+        return age >= 18
+    except Exception:
+        return False
+
+
 def _do_register(username, password, birthday="", ip=None, email=None):
     import re
     if not username or not password or not email:
@@ -196,26 +240,36 @@ def _do_register(username, password, birthday="", ip=None, email=None):
             return None, "Too many accounts from this network. Please log in to an existing account."
     hashed = generate_password_hash(password)
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    row = {
+        "username": username,
+        "email": email,
+        "password": hashed,
+        "birthday": birthday or None,
+        "picture_credits": 10,
+        "video_credits": 6,
+        "signup_ip": ip,
+        "images_today": 0,
+        "videos_today": 0,
+        "last_reset": now,
+        "api_key1": str(uuid.uuid4()),
+        "api_key2": str(uuid.uuid4()),
+    }
+    if birthday:
+        try:
+            row["is_adult"] = _user_is_adult(birthday)
+        except Exception:
+            pass
     try:
-        result = supabase.table("users").insert({
-            "username": username,
-            "email": email,
-            "password": hashed,
-            "birthday": birthday or None,
-            "picture_credits": 10,
-            "video_credits": 6,
-            "signup_ip": ip,
-            "images_today": 0,
-            "videos_today": 0,
-            "last_reset": now,
-            "api_key1": str(uuid.uuid4()),
-            "api_key2": str(uuid.uuid4()),
-        }).execute()
-        if not result.data:
-            return None, "Registration failed. Please try again."
-        return User(result.data[0]), None
-    except Exception as e:
-        return None, f"Registration error: {str(e)}"
+        result = supabase.table("users").insert(row).execute()
+    except Exception:
+        row.pop("is_adult", None)
+        try:
+            result = supabase.table("users").insert(row).execute()
+        except Exception as e:
+            return None, f"Registration error: {str(e)}"
+    if not result.data:
+        return None, "Registration failed. Please try again."
+    return User(result.data[0]), None
 
 
 def _do_login(username, password):
@@ -243,7 +297,7 @@ def register():
         if err:
             flash(err, "danger")
             return redirect(url_for("register"))
-        login_user(user)
+        login_user(user, remember=True)
         return redirect(url_for("percfectstudios"))
     return render_template("register.html")
 
@@ -258,7 +312,7 @@ def login():
         if err:
             flash(err, "danger")
         else:
-            login_user(user)
+            login_user(user, remember=True)
             return redirect(url_for("percfectstudios"))
     return render_template("login.html")
 
@@ -275,7 +329,7 @@ def auth_register_ajax():
     )
     if err:
         return jsonify({"error": err}), 400
-    login_user(user)
+    login_user(user, remember=True)
     return jsonify({"ok": True, "username": user.username,
                     "picture_credits": user.picture_credits,
                     "video_credits": user.video_credits})
@@ -290,7 +344,7 @@ def auth_login_ajax():
     )
     if err:
         return jsonify({"error": err}), 401
-    login_user(user)
+    login_user(user, remember=True)
     return jsonify({"ok": True, "username": user.username,
                     "picture_credits": user.picture_credits,
                     "video_credits": user.video_credits})
@@ -333,18 +387,6 @@ def dashboard():
 
 
 # ── Account Settings ─────────────────────────────────────
-def _user_is_adult(birthday: str) -> bool:
-    if not birthday:
-        return False
-    try:
-        born = datetime.date.fromisoformat(birthday)
-        today = datetime.date.today()
-        age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
-        return age >= 18
-    except Exception:
-        return False
-
-
 @app.route("/settings", methods=["GET", "POST"])
 @login_required
 def account_settings():
@@ -860,9 +902,93 @@ def kodi_credits():
     })
 
 
+def _build_princess_prompt(character, scene, style, extra=""):
+    parts = [
+        PRINCESS_STYLES.get(style, PRINCESS_STYLES["3d"]),
+        PRINCESS_CHARACTERS.get(character, ""),
+        PRINCESS_SCENES.get(scene, ""),
+        extra.strip(),
+        "masterpiece, best quality, sharp focus, beautiful composition",
+    ]
+    return ", ".join(p for p in parts if p)
+
+
+def _princess_guest_remaining():
+    today = datetime.date.today().isoformat()
+    key = f"princess_uses_{today}"
+    used = int(session.get(key, 0))
+    return max(0, GUEST_PRINCESS_DAILY_LIMIT - used), used
+
+
+def _increment_princess_guest_usage():
+    today = datetime.date.today().isoformat()
+    key = f"princess_uses_{today}"
+    session[key] = int(session.get(key, 0)) + 1
+    session.modified = True
+
+
 @app.route("/percfectprincesses")
 def percfect_princesses():
-    return render_template("percfect_princesses.html")
+    guest_remaining = None
+    if not current_user.is_authenticated:
+        guest_remaining, _ = _princess_guest_remaining()
+    return render_template(
+        "percfect_princesses.html",
+        characters=PRINCESS_CHARACTERS,
+        scenes=PRINCESS_SCENES,
+        styles=PRINCESS_STYLES,
+        guest_remaining=guest_remaining,
+        is_logged_in=current_user.is_authenticated,
+    )
+
+
+@app.route("/percfectprincesses/generate", methods=["POST"])
+def princess_generate():
+    if not current_user.is_authenticated:
+        remaining, used = _princess_guest_remaining()
+        if remaining <= 0:
+            return jsonify({
+                "error": f"Daily free limit reached ({GUEST_PRINCESS_DAILY_LIMIT}/day). Sign up free for unlimited princesses + studio access.",
+                "limit_reached": True,
+            }), 429
+
+    character = request.form.get("character", "ariel")
+    scene = request.form.get("scene", "castle")
+    style = request.form.get("style", "3d")
+    extra = request.form.get("prompt", "").strip()
+    if character not in PRINCESS_CHARACTERS:
+        character = "ariel"
+    if scene not in PRINCESS_SCENES:
+        scene = "castle"
+    if style not in PRINCESS_STYLES:
+        style = "3d"
+
+    full_prompt = _build_princess_prompt(character, scene, style, extra)
+
+    try:
+        result = generate_image_xai(full_prompt)
+        image_url = result["data"][0]["url"]
+
+        if not current_user.is_authenticated:
+            _increment_princess_guest_usage()
+            remaining, _ = _princess_guest_remaining()
+        else:
+            remaining = None
+            try:
+                supabase.table("generations").insert({
+                    "user_id": current_user.id,
+                    "type": "image",
+                    "prompt": full_prompt,
+                    "output_url": image_url,
+                    "created_at": datetime.datetime.utcnow().isoformat(),
+                }).execute()
+            except Exception:
+                pass
+
+        return jsonify({"url": image_url, "prompt": full_prompt, "remaining": remaining})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
