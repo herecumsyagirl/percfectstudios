@@ -140,27 +140,41 @@ def generate_video_xai(prompt: str, image_url: str = None, duration: int = 6) ->
 
 
 # ── Auth Routes ───────────────────────────────────────────
-def _do_register(username, password, birthday=""):
+def _do_register(username, password, birthday="", ip=None):
+    import re
     if not username or not password:
         return None, "Username and password are required."
+    if len(password) < 8 or not re.search(r'[A-Z]', password) \
+            or not re.search(r'[0-9]', password) or not re.search(r'[^A-Za-z0-9]', password):
+        return None, "Password needs 8+ characters, an uppercase letter, a number, and a symbol."
     exists = supabase.table("users").select("id").eq("username", username).execute()
     if exists.data:
         return None, "Username already taken."
+    if ip:
+        ip_exists = supabase.table("users").select("id").eq("signup_ip", ip).execute()
+        if ip_exists.data:
+            return None, "An account already exists from this network. Please log in."
     hashed = generate_password_hash(password)
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    result = supabase.table("users").insert({
-        "username": username,
-        "password": hashed,
-        "birthday": birthday or None,
-        "picture_credits": 10,
-        "video_credits": 6,
-        "images_today": 0,
-        "videos_today": 0,
-        "last_reset": now,
-        "api_key1": str(uuid.uuid4()),
-        "api_key2": str(uuid.uuid4()),
-    }).select().execute()
-    return User(result.data[0]), None
+    try:
+        result = supabase.table("users").insert({
+            "username": username,
+            "password": hashed,
+            "birthday": birthday or None,
+            "picture_credits": 10,
+            "video_credits": 6,
+            "signup_ip": ip,
+            "images_today": 0,
+            "videos_today": 0,
+            "last_reset": now,
+            "api_key1": str(uuid.uuid4()),
+            "api_key2": str(uuid.uuid4()),
+        }).select().execute()
+        if not result.data:
+            return None, "Registration failed. Please try again."
+        return User(result.data[0]), None
+    except Exception as e:
+        return None, f"Registration error: {str(e)}"
 
 
 def _do_login(username, password):
@@ -170,6 +184,11 @@ def _do_login(username, password):
     return None, "Invalid username or password."
 
 
+def _get_client_ip():
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+    return ip.split(",")[0].strip() if ip else None
+
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
@@ -177,6 +196,7 @@ def register():
             request.form.get("username", "").strip(),
             request.form.get("password", ""),
             request.form.get("birthday", ""),
+            ip=_get_client_ip(),
         )
         if err:
             flash(err, "danger")
@@ -208,6 +228,7 @@ def auth_register_ajax():
         data.get("username", "").strip(),
         data.get("password", ""),
         data.get("birthday", ""),
+        ip=_get_client_ip(),
     )
     if err:
         return jsonify({"error": err}), 400
