@@ -1,31 +1,33 @@
 {% extends "base.html" %}
-{% block title %}PercfectStudios · PercfectAI{% endblock %}
+{% block title %}PercfectStudios · Create AI Images & Videos{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container py-4">
 
-  <!-- Hero -->
-  <div class="studio-hero">
-    <h1>Percfect<span style="color:var(--accent)">Studios</span></h1>
-    <p class="subtitle">Generate images and videos with xAI · Aurora</p>
+  <!-- Header -->
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+    <div>
+      <h1 style="font-size:1.6rem;font-weight:800;letter-spacing:-0.03em;margin:0;">
+        Percfect<span style="color:var(--accent-2)">Studios</span>
+      </h1>
+      <p style="color:var(--text-muted);font-size:0.82rem;margin:0.2rem 0 0;">AI Image & Video Generation · Powered by xAI Aurora</p>
+    </div>
 
-    <div class="d-flex gap-2 justify-content-center mt-3 flex-wrap">
+    <div class="d-flex gap-2 align-items-center flex-wrap">
       {% if user %}
         <span class="credit-badge">
           <span class="dot"></span>
-          <span id="img-credits">{{ user.picture_credits }}</span> image credits
+          <span id="img-credits">{{ user.picture_credits }}</span> images
         </span>
         <span class="credit-badge">
-          <span class="dot" style="background:var(--accent-2)"></span>
-          <span id="vid-credits">{{ user.video_credits }}</span> video credits
+          <span class="dot" style="background:var(--accent-3)"></span>
+          <span id="vid-credits">{{ user.video_credits }}</span> videos
         </span>
-        <a href="/buy-credits" class="credit-badge text-decoration-none" style="border-color:var(--accent);color:var(--accent)">
-          + Buy more
-        </a>
+        <a href="/buy-credits" class="btn-accent btn-sm" style="padding:0.35rem 1rem;font-size:0.8rem;border-radius:10px;">+ Buy credits</a>
       {% else %}
         <span class="credit-badge" style="border-color:var(--accent);color:var(--accent-2);">
           <span class="dot"></span>
-          Sign up free — 5 image credits + 2 video credits
+          Sign up — get 5 free images
         </span>
       {% endif %}
     </div>
@@ -40,47 +42,48 @@
         <div class="panel-label">🖼 Image Generation</div>
 
         <div class="mb-3">
-          <label class="form-label">Prompt</label>
+          <label class="form-label">Describe your image</label>
           <textarea class="form-control" id="img-prompt" rows="3"
-            placeholder="A futuristic samurai on a neon-lit rooftop, cinematic lighting…"></textarea>
+            placeholder="A futuristic samurai standing on a neon-lit rooftop at night, cinematic lighting, rain reflecting the city lights…"></textarea>
         </div>
 
-        <div class="mb-3">
+        <div class="mb-4">
           <label class="form-label">Style</label>
           <div class="style-chips" id="img-style-chips">
             <span class="style-chip" onclick="toggleStyle(this,'img')">Photorealistic</span>
-            <span class="style-chip" onclick="toggleStyle(this,'img')">Anime</span>
             <span class="style-chip" onclick="toggleStyle(this,'img')">Cinematic</span>
-            <span class="style-chip" onclick="toggleStyle(this,'img')">Oil painting</span>
-            <span class="style-chip" onclick="toggleStyle(this,'img')">Pixel art</span>
+            <span class="style-chip" onclick="toggleStyle(this,'img')">Anime</span>
+            <span class="style-chip" onclick="toggleStyle(this,'img')">3D Render</span>
+            <span class="style-chip" onclick="toggleStyle(this,'img')">Oil Painting</span>
             <span class="style-chip" onclick="toggleStyle(this,'img')">Watercolor</span>
-            <span class="style-chip" onclick="toggleStyle(this,'img')">3D render</span>
-            <span class="style-chip" onclick="toggleStyle(this,'img')">Dark fantasy</span>
+            <span class="style-chip" onclick="toggleStyle(this,'img')">Pixel Art</span>
+            <span class="style-chip" onclick="toggleStyle(this,'img')">Dark Fantasy</span>
           </div>
         </div>
 
-        <button class="btn btn-accent w-100 py-2 mb-2" id="img-btn" onclick="generateImage()">
+        <button class="btn-accent w-100 py-2 mb-1" id="img-btn" onclick="generateImage()" style="border-radius:12px;">
           <span id="img-btn-text">Generate image</span>
           <span id="img-btn-spinner" style="display:none">Generating…</span>
         </button>
-        <p class="text-center" style="font-size:0.78rem;color:var(--text-muted)">
-          1 credit per image · <a href="#" onclick="openAuthModal('signup');return false;" style="color:var(--accent)" id="buy-link">sign up for free credits</a>
+        <p class="text-center mb-3" style="font-size:0.75rem;color:var(--text-muted);">
+          Uses 1 image credit
+          {% if not user %} · <a href="#" onclick="openAuthModal('signup');return false;" style="color:var(--accent-2)">Sign up for free credits</a>{% endif %}
         </p>
 
-        <div class="output-area mt-3" id="img-output-area">
+        <div class="output-area" id="img-output-area">
           <div class="output-placeholder" id="img-placeholder">
             <span class="icon">🖼</span>
-            <p>Image will appear here</p>
+            <p>Your image will appear here</p>
           </div>
           <div class="spinner-ring" id="img-spinner"></div>
           <img id="img-result" src="" alt="Generated image" />
         </div>
 
-        <div id="img-actions" style="display:none;" class="d-flex gap-2 mt-2">
-          <a id="img-download" href="#" download class="btn btn-outline-accent btn-sm">↓ Download</a>
-          <button onclick="sendToVideo()" class="btn btn-outline-accent btn-sm">▶ Animate this</button>
+        <div id="img-actions" style="display:none;" class="d-flex gap-2 mt-3">
+          <a id="img-download" href="#" download="image.jpg" class="btn-outline-accent btn-sm" style="font-size:0.82rem;padding:0.4rem 1rem;">↓ Download</a>
+          <button onclick="sendToVideo()" class="btn-outline-accent btn-sm" style="font-size:0.82rem;padding:0.4rem 1rem;">▶ Animate this</button>
         </div>
-        <div id="img-error" class="alert alert-danger mt-2" style="display:none;"></div>
+        <div id="img-error" class="alert alert-danger mt-3" style="display:none;font-size:0.85rem;"></div>
       </div>
     </div>
 
@@ -90,38 +93,42 @@
         <div class="panel-label">🎬 Video Generation</div>
 
         <div class="mb-3">
-          <label class="form-label">Prompt</label>
+          <label class="form-label">Describe your video</label>
           <textarea class="form-control" id="vid-prompt" rows="3"
-            placeholder="A dragon soaring over a misty mountain at dawn…"></textarea>
+            placeholder="A dragon soaring over a misty mountain range at dawn, sweeping aerial shot, epic scale…"></textarea>
         </div>
 
-        <div class="mb-3">
-          <label class="form-label">Reference image URL <span style="color:var(--text-muted)">(optional — animate an image)</span></label>
+        <div class="mb-4">
+          <label class="form-label" style="display:flex;align-items:center;gap:0.5rem;">
+            Animate an image
+            <span style="font-size:0.72rem;color:var(--text-muted);font-weight:400;">(optional — paste a URL or use ▶ Animate from the image panel)</span>
+          </label>
           <input class="form-control" id="vid-image-url" type="url"
             placeholder="https://… paste an image URL to animate it" />
         </div>
 
-        <button class="btn btn-accent w-100 py-2 mb-2" id="vid-btn" onclick="generateVideo()">
+        <button class="btn-accent w-100 py-2 mb-1" id="vid-btn" onclick="generateVideo()" style="border-radius:12px;">
           <span id="vid-btn-text">Generate video</span>
-          <span id="vid-btn-spinner" style="display:none">Generating…</span>
+          <span id="vid-btn-spinner" style="display:none">Generating… (this takes ~60s)</span>
         </button>
-        <p class="text-center" style="font-size:0.78rem;color:var(--text-muted)">
-          1 credit per video · <a href="/buy-credits" style="color:var(--accent)" id="vid-buy-link">buy credits</a>
+        <p class="text-center mb-3" style="font-size:0.75rem;color:var(--text-muted);">
+          Uses 1 video credit
+          {% if not user %} · <a href="#" onclick="openAuthModal('signup');return false;" style="color:var(--accent-2)">Sign up for free credits</a>{% endif %}
         </p>
 
-        <div class="output-area mt-3" id="vid-output-area">
+        <div class="output-area" id="vid-output-area">
           <div class="output-placeholder" id="vid-placeholder">
             <span class="icon">🎬</span>
-            <p>Video will appear here</p>
+            <p>Your video will appear here</p>
           </div>
           <div class="spinner-ring" id="vid-spinner"></div>
-          <video id="vid-result" controls loop></video>
+          <video id="vid-result" controls loop playsinline></video>
         </div>
 
-        <div id="vid-actions" style="display:none;" class="d-flex gap-2 mt-2">
-          <a id="vid-download" href="#" download class="btn btn-outline-accent btn-sm">↓ Download</a>
+        <div id="vid-actions" style="display:none;" class="d-flex gap-2 mt-3">
+          <a id="vid-download" href="#" download="video.mp4" class="btn-outline-accent btn-sm" style="font-size:0.82rem;padding:0.4rem 1rem;">↓ Download</a>
         </div>
-        <div id="vid-error" class="alert alert-danger mt-2" style="display:none;"></div>
+        <div id="vid-error" class="alert alert-danger mt-3" style="display:none;font-size:0.85rem;"></div>
       </div>
     </div>
 
@@ -133,20 +140,15 @@
 <script>
   const LOGGED_IN = {{ 'true' if user else 'false' }};
 
-  // After modal auth succeeds, update credits and retry
   function onAuthSuccess(data) {
-    // Show credits
-    if (!document.getElementById('img-credits')) {
-      document.querySelector('.studio-hero .d-flex').innerHTML =
-        `<span class="credit-badge"><span class="dot"></span><span id="img-credits">${data.picture_credits}</span> image credits</span>
-         <span class="credit-badge"><span class="dot" style="background:var(--accent-2)"></span><span id="vid-credits">${data.video_credits}</span> video credits</span>
-         <a href="/buy-credits" class="credit-badge text-decoration-none" style="border-color:var(--accent);color:var(--accent)">+ Buy more</a>`;
-      document.getElementById('buy-link') && (document.getElementById('buy-link').href = '/buy-credits');
-      document.getElementById('buy-link') && (document.getElementById('buy-link').textContent = 'buy credits');
-      document.getElementById('buy-link') && (document.getElementById('buy-link').onclick = null);
-    }
     window.LOGGED_IN = true;
-    // Retry the queued action
+    const wrap = document.querySelector('.studio-hero .d-flex') || document.querySelector('.d-flex.align-items-center .d-flex');
+    if (wrap) {
+      wrap.innerHTML = `
+        <span class="credit-badge"><span class="dot"></span><span id="img-credits">${data.picture_credits}</span> images</span>
+        <span class="credit-badge"><span class="dot" style="background:var(--accent-3)"></span><span id="vid-credits">${data.video_credits}</span> videos</span>
+        <a href="/buy-credits" class="btn-accent btn-sm" style="padding:0.35rem 1rem;font-size:0.8rem;border-radius:10px;">+ Buy credits</a>`;
+    }
     if (window._pendingGenerate) { window._pendingGenerate(); window._pendingGenerate = null; }
   }
 
@@ -158,66 +160,71 @@
 
   function toggleStyle(chip, panel) {
     document.querySelectorAll(`#${panel}-style-chips .style-chip`).forEach(c => c.classList.remove('selected'));
-    chip.classList.add('selected');
+    chip.classList.toggle('selected');
+    if (!chip.classList.contains('selected')) chip.classList.remove('selected');
+    else chip.classList.add('selected');
   }
 
-  async function generateImage() {
-    requireAuth(_generateImage);
-  }
+  function generateImage() { requireAuth(_generateImage); }
+  function generateVideo() { requireAuth(_generateVideo); }
 
   async function _generateImage() {
     const prompt = document.getElementById('img-prompt').value.trim();
-    if (!prompt) { showError('img', 'Please enter a prompt.'); return; }
+    if (!prompt) { showError('img', 'Please describe what you want to generate.'); return; }
     setLoading('img', true);
+
     const fd = new FormData();
     fd.append('prompt', prompt);
     const style = document.querySelector('#img-style-chips .style-chip.selected');
-    if (style) fd.append('style', style.textContent);
+    if (style) fd.append('style', style.textContent.trim());
+
     try {
       const res = await fetch('/percfectstudios/generate-image', { method: 'POST', body: fd });
       const data = await res.json();
-      if (!res.ok) { showError('img', data.error || 'Generation failed.'); return; }
+      if (!res.ok) { showError('img', data.error || 'Generation failed. Please try again.'); return; }
+
       const img = document.getElementById('img-result');
       img.src = data.url;
       img.style.display = 'block';
       document.getElementById('img-placeholder').style.display = 'none';
       document.getElementById('img-download').href = data.url;
       document.getElementById('img-actions').style.display = 'flex';
+
       const el = document.getElementById('img-credits');
       if (el) el.textContent = Math.max(0, parseInt(el.textContent) - 1);
-    } catch (e) {
-      showError('img', 'Network error. Please try again.');
+    } catch(e) {
+      showError('img', 'Network error — please try again.');
     } finally {
       setLoading('img', false);
     }
   }
 
-  async function generateVideo() {
-    requireAuth(_generateVideo);
-  }
-
   async function _generateVideo() {
     const prompt = document.getElementById('vid-prompt').value.trim();
-    if (!prompt) { showError('vid', 'Please enter a prompt.'); return; }
+    if (!prompt) { showError('vid', 'Please describe what you want to generate.'); return; }
     setLoading('vid', true);
+
     const fd = new FormData();
     fd.append('prompt', prompt);
     const imgUrl = document.getElementById('vid-image-url').value.trim();
     if (imgUrl) fd.append('image_url', imgUrl);
+
     try {
       const res = await fetch('/percfectstudios/generate-video', { method: 'POST', body: fd });
       const data = await res.json();
-      if (!res.ok) { showError('vid', data.error || 'Generation failed.'); return; }
+      if (!res.ok) { showError('vid', data.error || 'Generation failed. Please try again.'); return; }
+
       const vid = document.getElementById('vid-result');
       vid.src = data.url;
       vid.style.display = 'block';
       document.getElementById('vid-placeholder').style.display = 'none';
       document.getElementById('vid-download').href = data.url;
       document.getElementById('vid-actions').style.display = 'flex';
+
       const el = document.getElementById('vid-credits');
       if (el) el.textContent = Math.max(0, parseInt(el.textContent) - 1);
-    } catch (e) {
-      showError('vid', 'Network error. Please try again.');
+    } catch(e) {
+      showError('vid', 'Network error — please try again.');
     } finally {
       setLoading('vid', false);
     }
@@ -227,8 +234,8 @@
     const imgSrc = document.getElementById('img-result').src;
     if (imgSrc) {
       document.getElementById('vid-image-url').value = imgSrc;
+      document.getElementById('vid-prompt').scrollIntoView({ behavior: 'smooth', block: 'center' });
       document.getElementById('vid-prompt').focus();
-      document.getElementById('vid-prompt').scrollIntoView({ behavior: 'smooth' });
     }
   }
 
