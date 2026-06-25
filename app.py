@@ -15,6 +15,10 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "percfect-secret-key")
 
+# Serve static files reliably under gunicorn
+from whitenoise import WhiteNoise
+app.wsgi_app = WhiteNoise(app.wsgi_app, root=os.path.join(os.path.dirname(__file__), 'static'), prefix='static')
+
 # ── Supabase ──────────────────────────────────────────────
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
