@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block title %}Connect Your TV · PercfectStudios{% endblock %}
+
+{% block content %}
+<style>
+  body { background: var(--bg); }
+  .ka-wrap { max-width: 420px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+  .ka-tv-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+  .ka-title { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 0.25rem; }
+  .ka-sub { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 2rem; }
+  .ka-tabs { display: flex; background: var(--bg-2); border-radius: 12px; padding: 4px; margin-bottom: 1.5rem; gap: 4px; }
+  .ka-tab { flex: 1; padding: 0.5rem; border: none; border-radius: 9px; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; background: transparent; color: var(--text-muted); font-family: var(--font-main); }
+  .ka-tab.active { background: var(--accent); color: #fff; }
+  .ka-form { display: none; }
+  .ka-form.active { display: block; }
+  .field-err { display: none; color: var(--danger); font-size: 0.78rem; margin-top: 0.3rem; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-5px)} 40%,80%{transform:translateX(5px)} }
+  .shake { animation: shake 0.4s ease; }
+
+  /* PIN success screen */
+  .pin-screen { display: none; text-align: center; padding: 2rem 0; }
+  .pin-label { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.1em; }
+  .pin-code { font-size: 3.5rem; font-weight: 700; letter-spacing: 0.2em; font-family: var(--font-mono); color: var(--accent-2); background: rgba(124,92,252,0.1); border: 2px solid rgba(124,92,252,0.3); border-radius: 16px; padding: 1rem 1.5rem; display: inline-block; margin-bottom: 1rem; }
+  .pin-instruction { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
+  .pin-sub { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 2rem; }
+  .pin-timer { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); }
+  .pin-timer span { color: var(--accent-2); font-weight: 700; }
+  .pw-rule { font-size:.7rem;padding:.2rem .6rem;border-radius:99px;border:1px solid var(--border-2);background:var(--bg-3);color:var(--text-muted);transition:all .2s;font-family:var(--font-mono); }
+</style>
+
+<div class="ka-wrap">
+  <div class="text-center mb-4">
+    <div class="ka-tv-icon">📺</div>
+    <div class="ka-title">Connect Your TV</div>
+    <div class="ka-sub">Sign up or log in to activate PercfectStudios on your Fire Stick</div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="ka-tabs">
+    <button class="ka-tab active" onclick="kaTab('signup')">Sign up free</button>
+    <button class="ka-tab" onclick="kaTab('login')">Log in</button>
+  </div>
+
+  <!-- Sign up form -->
+  <div class="ka-form active" id="ka-signup">
+    <div class="mb-3">
+      <label class="form-label">Email address</label>
+      <input class="form-control" type="email" id="ks-email" placeholder="you@example.com" autocomplete="email" />
+      <div class="field-err" id="kerr-email"></div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Username</label>
+      <input class="form-control" id="ks-username" placeholder="pick a username" autocomplete="username" />
+      <div class="field-err" id="kerr-username"></div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Password</label>
+      <input class="form-control" type="password" id="ks-password" placeholder="8+ chars, uppercase, number, symbol" autocomplete="new-password" />
+      <div style="margin-top:0.4rem;display:flex;flex-wrap:wrap;gap:0.3rem;">
+        <span class="pw-rule" id="kpr-len">8+ chars</span>
+        <span class="pw-rule" id="kpr-upper">A–Z</span>
+        <span class="pw-rule" id="kpr-num">0–9</span>
+        <span class="pw-rule" id="kpr-sym">!@#...</span>
+      </div>
+      <div class="field-err" id="kerr-password"></div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Confirm Password</label>
+      <input class="form-control" type="password" id="ks-confirm" placeholder="Re-enter your password" autocomplete="new-password" />
+      <div class="field-err" id="kerr-confirm"></div>
+    </div>
+    <div class="mb-4">
+      <label class="form-label">Date of Birth <span style="color:var(--danger);font-size:0.75rem;">must be 18+</span></label>
+      <input class="form-control" type="date" id="ks-birthday" />
+      <div class="field-err" id="kerr-birthday"></div>
+    </div>
+    <div id="ks-error" class="alert alert-danger mb-3" style="display:none;font-size:0.85rem;"></div>
+    <button class="btn-accent w-100 py-2" style="border-radius:10px;border:none;cursor:pointer;font-size:1rem;font-weight:600;" id="ks-btn" onclick="submitKodiSignup()">
+      Create account &amp; connect TV →
+    </button>
+  </div>
+
+  <!-- Log in form -->
+  <div class="ka-form" id="ka-login">
+    <div class="mb-3">
+      <label class="form-label">Username or Email</label>
+      <input class="form-control" id="kl-username" placeholder="your username" autocomplete="username" />
+      <div class="field-err" id="kerr-l-username"></div>
+    </div>
+    <div class="mb-4">
+      <label class="form-label">Password</label>
+      <input class="form-control" type="password" id="kl-password" placeholder="your password" autocomplete="current-password" />
+      <div class="field-err" id="kerr-l-password"></div>
+    </div>
+    <div id="kl-error" class="alert alert-danger mb-3" style="display:none;font-size:0.85rem;"></div>
+    <button class="btn-accent w-100 py-2" style="border-radius:10px;border:none;cursor:pointer;font-size:1rem;font-weight:600;" id="kl-btn" onclick="submitKodiLogin()">
+      Log in &amp; connect TV →
+    </button>
+  </div>
+
+  <!-- PIN success screen (hidden until activated) -->
+  <div class="pin-screen" id="pin-screen">
+    <div class="pin-label">Your activation code</div>
+    <div class="pin-code" id="pin-value">------</div>
+    <div class="pin-instruction">Type this code on your Fire Stick</div>
+    <div class="pin-sub">Go to PercfectStudios → Activate → Enter Code</div>
+    <div class="pin-timer">Expires in <span id="pin-countdown">10:00</span></div>
+    <div style="margin-top:2rem;padding:1.25rem;background:var(--bg-2);border-radius:14px;border:1px solid var(--border);">
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.5rem;">Welcome to PercfectStudios</div>
+      <div style="font-size:0.9rem;font-weight:600;" id="pin-username"></div>
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.25rem;" id="pin-credits"></div>
+    </div>
+  </div>
+</div>
+
+<input type="hidden" id="ka-device-code" value="{{ device_code }}" />
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const DEVICE_CODE = document.getElementById('ka-device-code').value;
+
+  function kaTab(tab) {
+    document.getElementById('ka-signup').classList.toggle('active', tab === 'signup');
+    document.getElementById('ka-login').classList.toggle('active', tab === 'login');
+    document.querySelectorAll('.ka-tab').forEach((t, i) => {
+      t.classList.toggle('active', (i === 0 && tab === 'signup') || (i === 1 && tab === 'login'));
+    });
+  }
+
+  // Password chips
+  document.getElementById('ks-password').addEventListener('input', function() {
+    const v = this.value;
+    const mark = (id, ok) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.style.background = ok ? 'rgba(52,211,153,0.15)' : 'var(--bg-3)';
+      el.style.borderColor = ok ? 'rgba(52,211,153,0.4)' : 'var(--border-2)';
+      el.style.color = ok ? 'var(--success)' : 'var(--text-muted)';
+    };
+    mark('kpr-len', v.length >= 8);
+    mark('kpr-upper', /[A-Z]/.test(v));
+    mark('kpr-num', /[0-9]/.test(v));
+    mark('kpr-sym', /[^A-Za-z0-9]/.test(v));
+  });
+
+  function kFieldErr(id, msg) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = msg ? '' : 'none';
+  }
+  function kShake(inputId) {
+    const el = document.getElementById(inputId);
+    if (!el) return;
+    el.style.borderColor = 'var(--danger)';
+    el.classList.add('shake');
+    setTimeout(() => { el.classList.remove('shake'); }, 500);
+  }
+
+  function showPin(pin, username, imageCredits, videoCredits) {
+    document.getElementById('ka-signup').style.display = 'none';
+    document.getElementById('ka-login').style.display = 'none';
+    document.querySelector('.ka-tabs').style.display = 'none';
+    document.getElementById('pin-screen').style.display = 'block';
+    document.getElementById('pin-value').textContent = pin;
+    document.getElementById('pin-username').textContent = username;
+    document.getElementById('pin-credits').textContent =
+      imageCredits + ' image credits · ' + videoCredits + 's video time';
+
+    // 10-minute countdown
+    let secs = 600;
+    const timer = setInterval(() => {
+      secs--;
+      if (secs <= 0) { clearInterval(timer); document.getElementById('pin-countdown').textContent = 'Expired'; return; }
+      const m = Math.floor(secs / 60), s = secs % 60;
+      document.getElementById('pin-countdown').textContent = m + ':' + String(s).padStart(2, '0');
+    }, 1000);
+  }
+
+  async function submitKodiSignup() {
+    const btn = document.getElementById('ks-btn');
+    const email    = document.getElementById('ks-email').value.trim();
+    const username = document.getElementById('ks-username').value.trim();
+    const pw       = document.getElementById('ks-password').value;
+    const confirm  = document.getElementById('ks-confirm').value;
+    const dob      = document.getElementById('ks-birthday').value;
+
+    ['email','username','password','confirm','birthday'].forEach(f => kFieldErr('kerr-'+f, ''));
+    document.getElementById('ks-error').style.display = 'none';
+
+    let valid = true;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { kFieldErr('kerr-email','Valid email required.'); kShake('ks-email'); valid=false; }
+    if (!username) { kFieldErr('kerr-username','Username required.'); kShake('ks-username'); valid=false; }
+    if (pw.length < 8 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw)) {
+      kFieldErr('kerr-password','8+ chars, uppercase, number, symbol.'); kShake('ks-password'); valid=false;
+    } else if (pw !== confirm) { kFieldErr('kerr-confirm','Passwords do not match.'); kShake('ks-confirm'); valid=false; }
+    if (!dob) { kFieldErr('kerr-birthday','Date of birth required.'); kShake('ks-birthday'); valid=false; }
+    else if ((Date.now() - new Date(dob)) / (365.25*24*3600*1000) < 18) { kFieldErr('kerr-birthday','Must be 18 or older.'); kShake('ks-birthday'); valid=false; }
+    if (!valid) return;
+
+    btn.disabled = true; btn.textContent = 'Creating account…';
+    try {
+      const res = await fetch('/api/kodi/activate', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ action:'signup', email, username, password:pw, birthday:dob, device_code:DEVICE_CODE })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data.error || 'Something went wrong.';
+        if (msg.toLowerCase().includes('email')) kFieldErr('kerr-email', msg);
+        else if (msg.toLowerCase().includes('username')) kFieldErr('kerr-username', msg);
+        else { document.getElementById('ks-error').textContent = msg; document.getElementById('ks-error').style.display = ''; }
+        btn.disabled = false; btn.textContent = 'Create account & connect TV →'; return;
+      }
+      showPin(data.pin, data.username, data.image_credits, data.video_credits);
+    } catch(e) {
+      document.getElementById('ks-error').textContent = 'Network error. Please try again.';
+      document.getElementById('ks-error').style.display = '';
+      btn.disabled = false; btn.textContent = 'Create account & connect TV →';
+    }
+  }
+
+  async function submitKodiLogin() {
+    const btn = document.getElementById('kl-btn');
+    const username = document.getElementById('kl-username').value.trim();
+    const password = document.getElementById('kl-password').value;
+
+    ['l-username','l-password'].forEach(f => kFieldErr('kerr-'+f, ''));
+    document.getElementById('kl-error').style.display = 'none';
+
+    let valid = true;
+    if (!username) { kFieldErr('kerr-l-username','Username required.'); kShake('kl-username'); valid=false; }
+    if (!password) { kFieldErr('kerr-l-password','Password required.'); kShake('kl-password'); valid=false; }
+    if (!valid) return;
+
+    btn.disabled = true; btn.textContent = 'Logging in…';
+    try {
+      const res = await fetch('/api/kodi/activate', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ action:'login', username, password, device_code:DEVICE_CODE })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        document.getElementById('kl-error').textContent = data.error || 'Invalid credentials.';
+        document.getElementById('kl-error').style.display = '';
+        btn.disabled = false; btn.textContent = 'Log in & connect TV →'; return;
+      }
+      showPin(data.pin, data.username, data.image_credits, data.video_credits);
+    } catch(e) {
+      document.getElementById('kl-error').textContent = 'Network error.';
+      document.getElementById('kl-error').style.display = '';
+      btn.disabled = false; btn.textContent = 'Log in & connect TV →';
+    }
+  }
+</script>
+{% endblock %}

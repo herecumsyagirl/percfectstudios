@@ -584,5 +584,150 @@ def api_gallery():
     return jsonify(res.data)
 
 
+# ── Kodi activation flow ─────────────────────────────────
+
+@app.route("/kodi-activate")
+def kodi_activate_page():
+    device_code = request.args.get("device", "")
+    return render_template("kodi_activate.html", device_code=device_code)
+
+
+@app.route("/api/kodi/activate", methods=["POST"])
+def kodi_activate_api():
+    import random, string
+    data = request.get_json() or {}
+    action = data.get("action")
+    device_code = data.get("device_code", "")
+
+    if action == "signup":
+        user, err = _do_register(
+            data.get("username", "").strip(),
+            data.get("password", ""),
+            data.get("birthday", ""),
+            ip=_get_client_ip(),
+            email=data.get("email", "").strip().lower(),
+        )
+        if err:
+            return jsonify({"error": err}), 400
+    elif action == "login":
+        user, err = _do_login(
+            data.get("username", "").strip(),
+            data.get("password", ""),
+        )
+        if err:
+            return jsonify({"error": err}), 401
+    else:
+        return jsonify({"error": "Invalid action"}), 400
+
+    # Generate 6-digit PIN
+    pin = ''.join(random.choices(string.digits, k=6))
+    expires = (datetime.datetime.now(datetime.timezone.utc)
+               + datetime.timedelta(minutes=10)).isoformat()
+
+    # Store or update kodi session
+    existing = supabase.table("kodi_sessions").select("id").eq("device_code", device_code).execute()
+    if existing.data:
+        supabase.table("kodi_sessions").update({
+            "user_id": user.id, "pin": pin, "activated": False,
+            "expires_at": expires,
+        }).eq("device_code", device_code).execute()
+    else:
+        supabase.table("kodi_sessions").insert({
+            "device_code": device_code or str(uuid.uuid4()),
+            "user_id": user.id, "pin": pin, "activated": False,
+            "expires_at": expires,
+        }).execute()
+
+    # Get current credits
+    res = supabase.table("users").select("picture_credits,video_credits,api_key1") \
+        .eq("id", user.id).single().execute()
+    credits = res.data or {}
+
+    return jsonify({
+        "pin": pin,
+        "username": user.username,
+        "image_credits": credits.get("picture_credits", 0),
+        "video_credits": credits.get("video_credits", 0),
+    })
+
+
+@app.route("/api/kodi/verify", methods=["POST"])
+def kodi_verify():
+    """Fire Stick calls this with device_code + PIN to get api_key."""
+    data = request.get_json() or {}
+    device_code = data.get("device_code", "")
+    pin = data.get("pin", "")
+
+    session = supabase.table("kodi_sessions").select("*") \
+        .eq("device_code", device_code).eq("pin", pin).execute()
+    if not session.data:
+        return jsonify({"error": "Invalid code. Try again."}), 401
+
+    row = session.data[0]
+    # Check expiry
+    expires = datetime.datetime.fromisoformat(str(row["expires_at"]))
+    if datetime.datetime.now(datetime.timezone.utc) > expires:
+        return jsonify({"error": "Code expired. Please re-scan the QR code."}), 401
+
+    # Mark activated
+    supabase.table("kodi_sessions").update({"activated": True}) \
+        .eq("id", row["id"]).execute()
+
+    # Return api_key + credits
+    user_res = supabase.table("users") \
+        .select("api_key1,picture_credits,video_credits,username") \
+        .eq("id", row["user_id"]).single().execute()
+    u = user_res.data or {}
+
+    return jsonify({
+        "api_key": u.get("api_key1"),
+        "username": u.get("username"),
+        "image_credits": u.get("picture_credits", 0),
+        "video_credits": u.get("video_credits", 0),
+    })
+
+
+@app.route("/api/kodi/poll/<device_code>")
+def kodi_poll(device_code):
+    """Fire Stick polls this while waiting for phone activation."""
+    session = supabase.table("kodi_sessions").select("*") \
+        .eq("device_code", device_code).execute()
+    if not session.data:
+        return jsonify({"status": "waiting"})
+
+    row = session.data[0]
+    expires = datetime.datetime.fromisoformat(str(row["expires_at"]))
+    if datetime.datetime.now(datetime.timezone.utc) > expires:
+        return jsonify({"status": "expired"})
+
+    if not row.get("activated"):
+        return jsonify({"status": "waiting"})
+
+    user_res = supabase.table("users") \
+        .select("api_key1,picture_credits,video_credits,username") \
+        .eq("id", row["user_id"]).single().execute()
+    u = user_res.data or {}
+
+    return jsonify({
+        "status": "activated",
+        "api_key": u.get("api_key1"),
+        "username": u.get("username"),
+        "image_credits": u.get("picture_credits", 0),
+        "video_credits": u.get("video_credits", 0),
+    })
+
+
+@app.route("/api/kodi/credits")
+@require_api_key
+def kodi_credits():
+    """Fire Stick polls this for live credit balance."""
+    u = g.api_user
+    return jsonify({
+        "image_credits": u.get("picture_credits", 0),
+        "video_credits": u.get("video_credits", 0),
+        "username": u.get("username"),
+    })
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
