@@ -66,8 +66,13 @@ def load_user(user_id):
 def reset_daily_if_needed(user_id):
     res = supabase.table("users").select("last_reset,images_today,videos_today").eq("id", user_id).single().execute()
     data = res.data
-    last = datetime.datetime.fromisoformat(data["last_reset"]) if data["last_reset"] else None
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
+    try:
+        last = datetime.datetime.fromisoformat(str(data["last_reset"])) if data["last_reset"] else None
+        if last and last.tzinfo is None:
+            last = last.replace(tzinfo=datetime.timezone.utc)
+    except Exception:
+        last = None
     if last is None or (now - last).days >= 1:
         supabase.table("users").update({
             "images_today": 0,
