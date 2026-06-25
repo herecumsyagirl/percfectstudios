@@ -92,13 +92,13 @@ def generate_image_xai(prompt: str) -> dict:
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "grok-2-image",
+        "model": "grok-2-image-1212",
         "prompt": prompt,
         "n": 1,
-        "response_format": "url"
     }
     resp = requests.post(f"{XAI_BASE_URL}/images/generations", json=payload, headers=headers, timeout=60)
-    resp.raise_for_status()
+    if not resp.ok:
+        raise Exception(f"xAI image error {resp.status_code}: {resp.text}")
     return resp.json()
 
 

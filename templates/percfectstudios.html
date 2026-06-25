@@ -135,6 +135,18 @@
         </button>
         <p class="credit-note">1 credit · <a href="#" onclick="openAuthModal('signup');return false;" {% if user %}style="display:none"{% endif %}>Sign up for 1 free video</a></p>
 
+        <!-- Video progress bar — visible between button and output -->
+        <div id="vid-progress-wrap" style="display:none;margin:1rem 0;padding:1rem 1.25rem;background:var(--bg-3);border:1px solid var(--border);border-radius:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
+            <span style="font-size:0.85rem;font-weight:600;" id="vid-progress-label">Generating your video…</span>
+            <span style="font-family:var(--font-mono);font-size:0.8rem;color:var(--accent-2);"><span id="vid-elapsed">0</span>s</span>
+          </div>
+          <div style="background:var(--bg-2);border-radius:99px;height:8px;overflow:hidden;">
+            <div id="vid-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:99px;transition:width 1s linear;"></div>
+          </div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;text-align:center;">Usually 60–120 seconds · do not refresh</div>
+        </div>
+
         <div class="output-area" id="vid-output-area">
           <div class="output-placeholder" id="vid-placeholder">
             <div class="placeholder-grid">
@@ -146,14 +158,6 @@
             <p class="ph-text">Your video will appear here</p>
           </div>
           <div class="shimmer-overlay" id="vid-shimmer"></div>
-          <!-- Video progress bar -->
-          <div id="vid-progress-wrap" style="display:none;padding:1.5rem 1rem;text-align:center;">
-            <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.75rem;" id="vid-progress-label">Generating video… <span id="vid-elapsed">0</span>s</div>
-            <div style="background:var(--bg-3);border-radius:99px;height:6px;overflow:hidden;max-width:320px;margin:0 auto;">
-              <div id="vid-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:99px;transition:width 1s linear;"></div>
-            </div>
-            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">Usually takes 60–120 seconds</div>
-          </div>
           <video id="vid-result" controls loop playsinline></video>
         </div>
 
