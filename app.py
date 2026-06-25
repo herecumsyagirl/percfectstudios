@@ -34,9 +34,9 @@ STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 
 # Credit packages: price_id -> (image_credits, video_credits)
 CREDIT_PACKAGES = {
-    "starter":   {"name": "Starter",  "price": 500,  "image_credits": 25,  "video_credits": 0,  "price_id": os.getenv("STRIPE_PRICE_STARTER")},
-    "creator":   {"name": "Creator",  "price": 1500, "image_credits": 100, "video_credits": 5,  "price_id": os.getenv("STRIPE_PRICE_CREATOR")},
-    "pro":       {"name": "Pro",      "price": 2500, "image_credits": 200, "video_credits": 15, "price_id": os.getenv("STRIPE_PRICE_PRO")},
+    "starter":   {"name": "Starter",  "price": 500,  "image_credits": 50,  "video_credits": 5,  "price_id": os.getenv("STRIPE_PRICE_STARTER")},
+    "creator":   {"name": "Creator",  "price": 1500, "image_credits": 150, "video_credits": 15, "price_id": os.getenv("STRIPE_PRICE_CREATOR")},
+    "pro":       {"name": "Pro",      "price": 2500, "image_credits": 250, "video_credits": 25, "price_id": os.getenv("STRIPE_PRICE_PRO")},
 }
 
 # ── Flask-Login ───────────────────────────────────────────
