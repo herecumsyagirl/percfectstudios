@@ -619,36 +619,40 @@ def kodi_activate_api():
     else:
         return jsonify({"error": "Invalid action"}), 400
 
-    # Generate 6-digit PIN
-    pin = ''.join(random.choices(string.digits, k=6))
-    expires = (datetime.datetime.now(datetime.timezone.utc)
-               + datetime.timedelta(minutes=10)).isoformat()
+    try:
+        # Generate 6-digit PIN
+        pin = ''.join(random.choices(string.digits, k=6))
+        expires = (datetime.datetime.now(datetime.timezone.utc)
+                   + datetime.timedelta(minutes=10)).isoformat()
 
-    # Store or update kodi session
-    existing = supabase.table("kodi_sessions").select("id").eq("device_code", device_code).execute()
-    if existing.data:
-        supabase.table("kodi_sessions").update({
-            "user_id": user.id, "pin": pin, "activated": False,
-            "expires_at": expires,
-        }).eq("device_code", device_code).execute()
-    else:
-        supabase.table("kodi_sessions").insert({
-            "device_code": device_code or str(uuid.uuid4()),
-            "user_id": user.id, "pin": pin, "activated": False,
-            "expires_at": expires,
-        }).execute()
+        # Store or update kodi session
+        dc = device_code or str(uuid.uuid4())
+        existing = supabase.table("kodi_sessions").select("id").eq("device_code", dc).execute()
+        if existing.data:
+            supabase.table("kodi_sessions").update({
+                "user_id": user.id, "pin": pin, "activated": False,
+                "expires_at": expires,
+            }).eq("device_code", dc).execute()
+        else:
+            supabase.table("kodi_sessions").insert({
+                "device_code": dc,
+                "user_id": user.id, "pin": pin, "activated": False,
+                "expires_at": expires,
+            }).execute()
 
-    # Get current credits
-    res = supabase.table("users").select("picture_credits,video_credits,api_key1") \
-        .eq("id", user.id).single().execute()
-    credits = res.data or {}
+        # Get current credits
+        res = supabase.table("users").select("picture_credits,video_credits,api_key1") \
+            .eq("id", user.id).single().execute()
+        credits = res.data or {}
 
-    return jsonify({
-        "pin": pin,
-        "username": user.username,
-        "image_credits": credits.get("picture_credits", 0),
-        "video_credits": credits.get("video_credits", 0),
-    })
+        return jsonify({
+            "pin": pin,
+            "username": user.username,
+            "image_credits": credits.get("picture_credits", 0),
+            "video_credits": credits.get("video_credits", 0),
+        })
+    except Exception as e:
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
 
 
 @app.route("/api/kodi/verify", methods=["POST"])
@@ -665,7 +669,10 @@ def kodi_verify():
 
     row = session.data[0]
     # Check expiry
-    expires = datetime.datetime.fromisoformat(str(row["expires_at"]))
+    expires_str = str(row["expires_at"]).replace('Z', '+00:00')
+    expires = datetime.datetime.fromisoformat(expires_str)
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=datetime.timezone.utc)
     if datetime.datetime.now(datetime.timezone.utc) > expires:
         return jsonify({"error": "Code expired. Please re-scan the QR code."}), 401
 
@@ -696,7 +703,10 @@ def kodi_poll(device_code):
         return jsonify({"status": "waiting"})
 
     row = session.data[0]
-    expires = datetime.datetime.fromisoformat(str(row["expires_at"]))
+    expires_str = str(row["expires_at"]).replace('Z', '+00:00')
+    expires = datetime.datetime.fromisoformat(expires_str)
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=datetime.timezone.utc)
     if datetime.datetime.now(datetime.timezone.utc) > expires:
         return jsonify({"status": "expired"})
 
