@@ -19,7 +19,7 @@
         <span class="credit-badge"><span class="dot" style="background:var(--accent-3)"></span><span id="vid-credits">{{ user.video_credits }}</span> video credits</span>
         <a href="/buy-credits" class="btn-accent" style="padding:0.45rem 1.2rem;font-size:0.85rem;">+ Buy credits</a>
       {% else %}
-        <span class="credit-badge free-badge"><span class="badge-dot pulse"></span>Sign up free — 5 images + 2 videos included</span>
+        <span class="credit-badge free-badge"><span class="badge-dot pulse"></span>Sign up free — 10 images + 1 video included</span>
       {% endif %}
     </div>
   </div>
@@ -73,7 +73,7 @@
           <span id="img-btn-text">✦ Generate image</span>
           <span id="img-btn-spinner" style="display:none">Generating…</span>
         </button>
-        <p class="credit-note">1 credit · <a href="#" onclick="openAuthModal('signup');return false;" {% if user %}style="display:none"{% endif %}>Sign up for 5 free</a></p>
+        <p class="credit-note">1 credit · <a href="#" onclick="openAuthModal('signup');return false;" {% if user %}style="display:none"{% endif %}>Sign up for 10 free</a></p>
 
         <div class="output-area" id="img-output-area">
           <div class="output-placeholder" id="img-placeholder">
@@ -133,7 +133,7 @@
           <span id="vid-btn-text">▶ Generate video</span>
           <span id="vid-btn-spinner" style="display:none">Generating… (~60s)</span>
         </button>
-        <p class="credit-note">1 credit · <a href="#" onclick="openAuthModal('signup');return false;" {% if user %}style="display:none"{% endif %}>Sign up for 2 free</a></p>
+        <p class="credit-note">1 credit · <a href="#" onclick="openAuthModal('signup');return false;" {% if user %}style="display:none"{% endif %}>Sign up for 1 free video</a></p>
 
         <div class="output-area" id="vid-output-area">
           <div class="output-placeholder" id="vid-placeholder">

@@ -140,16 +140,21 @@ def generate_video_xai(prompt: str, image_url: str = None, duration: int = 6) ->
 
 
 # ── Auth Routes ───────────────────────────────────────────
-def _do_register(username, password, birthday="", ip=None):
+def _do_register(username, password, birthday="", ip=None, email=None):
     import re
-    if not username or not password:
-        return None, "Username and password are required."
+    if not username or not password or not email:
+        return None, "All fields are required."
+    if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+        return None, "Enter a valid email address."
     if len(password) < 8 or not re.search(r'[A-Z]', password) \
             or not re.search(r'[0-9]', password) or not re.search(r'[^A-Za-z0-9]', password):
         return None, "Password needs 8+ characters, an uppercase letter, a number, and a symbol."
     exists = supabase.table("users").select("id").eq("username", username).execute()
     if exists.data:
         return None, "Username already taken."
+    email_exists = supabase.table("users").select("id").eq("email", email).execute()
+    if email_exists.data:
+        return None, "An account with that email already exists."
     if ip:
         ip_exists = supabase.table("users").select("id").eq("signup_ip", ip).execute()
         if ip_exists.data:
@@ -159,6 +164,7 @@ def _do_register(username, password, birthday="", ip=None):
     try:
         result = supabase.table("users").insert({
             "username": username,
+            "email": email,
             "password": hashed,
             "birthday": birthday or None,
             "picture_credits": 10,
@@ -169,7 +175,7 @@ def _do_register(username, password, birthday="", ip=None):
             "last_reset": now,
             "api_key1": str(uuid.uuid4()),
             "api_key2": str(uuid.uuid4()),
-        }).select().execute()
+        }).execute()
         if not result.data:
             return None, "Registration failed. Please try again."
         return User(result.data[0]), None
@@ -229,6 +235,7 @@ def auth_register_ajax():
         data.get("password", ""),
         data.get("birthday", ""),
         ip=_get_client_ip(),
+        email=data.get("email", "").strip().lower(),
     )
     if err:
         return jsonify({"error": err}), 400
