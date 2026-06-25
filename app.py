@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, g
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
 from supabase import create_client, Client
 from functools import wraps
 import os
@@ -15,10 +16,16 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "percfect-secret-key")
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+)
 
 # Serve static files reliably under gunicorn
 from whitenoise import WhiteNoise
 app.wsgi_app = WhiteNoise(app.wsgi_app, root=os.path.join(os.path.dirname(__file__), 'static'), prefix='static')
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 # ── Supabase ──────────────────────────────────────────────
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -185,8 +192,8 @@ def _do_register(username, password, birthday="", ip=None, email=None):
         return None, "An account with that email already exists."
     if ip:
         ip_exists = supabase.table("users").select("id").eq("signup_ip", ip).execute()
-        if ip_exists.data:
-            return None, "An account already exists from this network. Please log in."
+        if len(ip_exists.data or []) >= 3:
+            return None, "Too many accounts from this network. Please log in to an existing account."
     hashed = generate_password_hash(password)
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     try:
@@ -326,11 +333,25 @@ def dashboard():
 
 
 # ── Account Settings ─────────────────────────────────────
+def _user_is_adult(birthday: str) -> bool:
+    if not birthday:
+        return False
+    try:
+        born = datetime.date.fromisoformat(birthday)
+        today = datetime.date.today()
+        age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+        return age >= 18
+    except Exception:
+        return False
+
+
 @app.route("/settings", methods=["GET", "POST"])
 @login_required
 def account_settings():
-    res = supabase.table("users").select("username,email,birthday,picture_credits,video_credits,images_today,videos_today,created_at").eq("id", current_user.id).single().execute()
-    user_data = res.data
+    res = supabase.table("users").select(
+        "username,email,birthday,picture_credits,video_credits,images_today,videos_today,created_at"
+    ).eq("id", current_user.id).single().execute()
+    user_data = res.data or {}
     success = None
     error = None
 
@@ -345,18 +366,29 @@ def account_settings():
                 updates["email"] = email
             if birthday:
                 updates["birthday"] = birthday
+                try:
+                    updates["is_adult"] = _user_is_adult(birthday)
+                except Exception:
+                    pass
             if updates:
-                supabase.table("users").update(updates).eq("id", current_user.id).execute()
+                try:
+                    supabase.table("users").update(updates).eq("id", current_user.id).execute()
+                except Exception:
+                    updates.pop("is_adult", None)
+                    if updates:
+                        supabase.table("users").update(updates).eq("id", current_user.id).execute()
                 user_data.update(updates)
                 success = "Profile updated."
             else:
                 error = "Nothing to update."
 
         elif action == "password":
+            pw_res = supabase.table("users").select("password").eq("id", current_user.id).single().execute()
+            stored_hash = (pw_res.data or {}).get("password", "")
             current_pw = request.form.get("current_password", "")
             new_pw = request.form.get("new_password", "")
             confirm_pw = request.form.get("confirm_password", "")
-            if not check_password_hash(user_data.get("password", ""), current_pw):
+            if not check_password_hash(stored_hash, current_pw):
                 error = "Current password is incorrect."
             elif len(new_pw) < 8:
                 error = "New password must be at least 8 characters."
@@ -830,14 +862,7 @@ def kodi_credits():
 
 @app.route("/percfectprincesses")
 def percfect_princesses():
-    is_adult = False
-    if current_user.is_authenticated:
-        try:
-            row = supabase.table("users").select("is_adult").eq("id", current_user.id).single().execute()
-            is_adult = bool(row.data.get("is_adult", False))
-        except Exception:
-            is_adult = False
-    return render_template("percfect_princesses.html", is_adult=is_adult)
+    return render_template("percfect_princesses.html")
 
 
 if __name__ == "__main__":

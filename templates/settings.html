@@ -5,7 +5,7 @@
   .settings-wrap { max-width: 620px; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
   .settings-wrap h2 { font-weight: 800; letter-spacing: -0.02em; margin-bottom: 2rem; }
   .settings-card {
-    background: var(--surface-2);
+    background: var(--bg-2);
     border: 1px solid var(--border-2);
     border-radius: 16px;
     padding: 1.75rem;
@@ -21,12 +21,12 @@
     text-transform: uppercase; letter-spacing: 0.05em;
   }
   .form-control-dark {
-    background: var(--surface-1); border: 1px solid var(--border-2);
+    background: var(--bg-3); border: 1px solid var(--border-2);
     color: var(--text); border-radius: 10px; padding: 0.6rem 0.9rem;
     width: 100%; font-size: 0.9rem; transition: border-color 0.2s;
   }
   .form-control-dark:focus {
-    outline: none; border-color: var(--purple); background: var(--surface-1);
+    outline: none; border-color: var(--accent); background: var(--bg-3);
     color: var(--text); box-shadow: 0 0 0 3px rgba(124,92,252,0.15);
   }
   .form-control-dark:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -42,10 +42,10 @@
   }
   .credit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem; }
   .credit-box {
-    background: var(--surface-1); border: 1px solid var(--border-2);
+    background: var(--bg-3); border: 1px solid var(--border-2);
     border-radius: 12px; padding: 1rem; text-align: center;
   }
-  .credit-box .cval { font-size: 2rem; font-weight: 800; color: var(--purple-light); line-height: 1; }
+  .credit-box .cval { font-size: 2rem; font-weight: 800; color: var(--accent-2); line-height: 1; }
   .credit-box .clabel { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.06em; }
   .support-link {
     display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1rem;
@@ -53,7 +53,7 @@
     color: var(--text); text-decoration: none; font-size: 0.9rem;
     transition: border-color 0.2s, background 0.2s; margin-bottom: 0.5rem;
   }
-  .support-link:hover { border-color: var(--purple); background: rgba(124,92,252,0.06); color: var(--text); }
+  .support-link:hover { border-color: var(--accent); background: rgba(124,92,252,0.06); color: var(--text); }
   .support-link .sicon { font-size: 1.2rem; width: 28px; text-align: center; }
   .support-link small { display: block; color: var(--text-muted); font-size: 0.75rem; }
 </style>
