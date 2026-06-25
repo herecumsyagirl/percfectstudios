@@ -108,17 +108,17 @@ def generate_video_xai(prompt: str, image_url: str = None, duration: int = 6) ->
         "Authorization": f"Bearer {XAI_API_KEY}",
         "Content-Type": "application/json"
     }
-    payload = {"model": "aurora", "prompt": prompt, "duration": duration}
+    payload = {"model": "grok-imagine-video", "prompt": prompt, "duration": duration}
     if image_url:
         payload["image_url"] = image_url
 
     # Submit job
-    resp = requests.post(f"{XAI_BASE_URL}/video/generations", json=payload, headers=headers, timeout=30)
+    resp = requests.post(f"{XAI_BASE_URL}/videos/generations", json=payload, headers=headers, timeout=30)
     if not resp.ok:
         raise Exception(f"xAI video error {resp.status_code}: {resp.text}")
 
     job = resp.json()
-    job_id = job.get("id")
+    job_id = job.get("request_id") or job.get("id")
     if not job_id:
         # Synchronous response with URL already
         return job
@@ -126,12 +126,12 @@ def generate_video_xai(prompt: str, image_url: str = None, duration: int = 6) ->
     # Poll until complete (max 3 min)
     for _ in range(36):
         time.sleep(5)
-        poll = requests.get(f"{XAI_BASE_URL}/video/generations/{job_id}", headers=headers, timeout=15)
+        poll = requests.get(f"{XAI_BASE_URL}/videos/{job_id}", headers=headers, timeout=15)
         if not poll.ok:
             continue
         result = poll.json()
         status = result.get("status", "")
-        if status == "succeeded":
+        if status in ("done", "succeeded"):
             return result
         if status in ("failed", "cancelled"):
             raise Exception(f"Video generation {status}: {result.get('error', '')}")
@@ -203,6 +203,7 @@ def register():
             request.form.get("password", ""),
             request.form.get("birthday", ""),
             ip=_get_client_ip(),
+            email=request.form.get("email", "").strip().lower(),
         )
         if err:
             flash(err, "danger")
@@ -265,6 +266,12 @@ def auth_login_ajax():
 def logout():
     logout_user()
     return redirect(url_for("index"))
+
+
+# ── Health ping (UptimeRobot keeps Render awake) ─────────
+@app.route("/ping")
+def ping():
+    return "ok", 200
 
 
 # ── Main Pages ────────────────────────────────────────────
@@ -556,7 +563,9 @@ def api_generate_video():
 
     try:
         result = generate_video_xai(prompt, image_url)
-        video_url = result.get("url") or result.get("data", [{}])[0].get("url")
+        video_url = (result.get("video") or {}).get("url") \
+            or result.get("url") \
+            or (result.get("data") or [{}])[0].get("url")
 
         supabase.table("users").update({
             "video_credits": user["video_credits"] - 1,
