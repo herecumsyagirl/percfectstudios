@@ -2,175 +2,339 @@
 {% block title %}Account Settings · PercfectAI{% endblock %}
 {% block content %}
 <style>
-  .settings-wrap { max-width: 620px; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
-  .settings-wrap h2 { font-weight: 800; letter-spacing: -0.02em; margin-bottom: 2rem; }
+  .settings-shell { max-width: 960px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+  .settings-header { margin-bottom: 1.75rem; }
+  .settings-header h1 { font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.25rem; font-size: 1.75rem; }
+  .settings-header p { color: var(--text-muted); font-size: 0.9rem; margin: 0; }
+  .settings-layout { display: grid; grid-template-columns: 220px 1fr; gap: 1.25rem; align-items: start; }
+  @media (max-width: 768px) {
+    .settings-layout { grid-template-columns: 1fr; }
+    .settings-nav { display: flex; overflow-x: auto; gap: 0.35rem; padding-bottom: 0.25rem; }
+    .settings-nav a { white-space: nowrap; margin-bottom: 0 !important; }
+  }
+  .settings-nav {
+    background: var(--bg-2); border: 1px solid var(--border-2);
+    border-radius: 16px; padding: 0.75rem; position: sticky; top: 5.5rem;
+  }
+  .settings-nav a {
+    display: flex; align-items: center; gap: 0.55rem;
+    padding: 0.65rem 0.85rem; border-radius: 10px;
+    color: var(--text-muted); text-decoration: none; font-size: 0.85rem;
+    font-weight: 600; margin-bottom: 0.2rem; transition: all 0.15s;
+  }
+  .settings-nav a:hover { background: rgba(124,92,252,0.08); color: var(--text); }
+  .settings-nav a.active { background: rgba(124,92,252,0.16); color: var(--accent-2); }
+  .settings-nav .nav-icon { width: 18px; text-align: center; }
+  .settings-panel { display: none; }
+  .settings-panel.active { display: block; }
   .settings-card {
-    background: var(--bg-2);
-    border: 1px solid var(--border-2);
-    border-radius: 16px;
-    padding: 1.75rem;
-    margin-bottom: 1.25rem;
+    background: var(--bg-2); border: 1px solid var(--border-2);
+    border-radius: 16px; padding: 1.75rem; margin-bottom: 1rem;
   }
-  .settings-section-title {
-    font-weight: 700; font-size: 0.9rem; text-transform: uppercase;
-    letter-spacing: 0.07em; color: var(--text-muted); margin-bottom: 1.25rem;
+  .settings-card h3 {
+    font-size: 1.05rem; font-weight: 800; margin-bottom: 0.35rem; letter-spacing: -0.02em;
   }
+  .settings-card .sub { color: var(--text-muted); font-size: 0.82rem; margin-bottom: 1.25rem; }
   .form-label-sm {
-    display: block; font-size: 0.8rem; font-weight: 600;
+    display: block; font-size: 0.75rem; font-weight: 700;
     color: var(--text-muted); margin-bottom: 0.4rem;
-    text-transform: uppercase; letter-spacing: 0.05em;
+    text-transform: uppercase; letter-spacing: 0.06em;
   }
   .form-control-dark {
     background: var(--bg-3); border: 1px solid var(--border-2);
-    color: var(--text); border-radius: 10px; padding: 0.6rem 0.9rem;
+    color: var(--text); border-radius: 10px; padding: 0.65rem 0.9rem;
     width: 100%; font-size: 0.9rem; transition: border-color 0.2s;
   }
   .form-control-dark:focus {
-    outline: none; border-color: var(--accent); background: var(--bg-3);
-    color: var(--text); box-shadow: 0 0 0 3px rgba(124,92,252,0.15);
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,92,252,0.15);
   }
-  .form-control-dark:disabled { opacity: 0.45; cursor: not-allowed; }
-  .alert-success-bar {
-    background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3);
-    color: #4ade80; border-radius: 10px; padding: 0.75rem 1rem;
-    margin-bottom: 1.25rem; font-size: 0.9rem;
+  .form-hint { color: var(--text-muted); font-size: 0.75rem; margin-top: 0.35rem; display: block; }
+  .alert-success-bar, .alert-error-bar {
+    border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.9rem;
   }
-  .alert-error-bar {
-    background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3);
-    color: #f87171; border-radius: 10px; padding: 0.75rem 1rem;
-    margin-bottom: 1.25rem; font-size: 0.9rem;
+  .alert-success-bar { background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3); color: #4ade80; }
+  .alert-error-bar { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #f87171; }
+  .credit-hero {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem;
   }
-  .credit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem; }
   .credit-box {
     background: var(--bg-3); border: 1px solid var(--border-2);
-    border-radius: 12px; padding: 1rem; text-align: center;
+    border-radius: 14px; padding: 1.1rem; text-align: center;
   }
-  .credit-box .cval { font-size: 2rem; font-weight: 800; color: var(--accent-2); line-height: 1; }
-  .credit-box .clabel { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.06em; }
-  .support-link {
-    display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1rem;
-    border: 1px solid var(--border-2); border-radius: 12px;
-    color: var(--text); text-decoration: none; font-size: 0.9rem;
-    transition: border-color 0.2s, background 0.2s; margin-bottom: 0.5rem;
+  .credit-box .cval { font-size: 2.2rem; font-weight: 800; color: var(--accent-2); line-height: 1; }
+  .credit-box .clabel { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  .card-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: 0.9rem 1rem; border: 1px solid var(--border-2); border-radius: 12px;
+    background: var(--bg-3); margin-bottom: 0.5rem;
   }
-  .support-link:hover { border-color: var(--accent); background: rgba(124,92,252,0.06); color: var(--text); }
-  .support-link .sicon { font-size: 1.2rem; width: 28px; text-align: center; }
-  .support-link small { display: block; color: var(--text-muted); font-size: 0.75rem; }
+  .card-row .brand { font-weight: 700; text-transform: capitalize; }
+  .card-row .meta { color: var(--text-muted); font-size: 0.82rem; }
+  .pay-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.75rem 0; border-bottom: 1px solid var(--border);
+    font-size: 0.88rem;
+  }
+  .pay-row:last-child { border-bottom: none; }
+  .pay-row .amt { font-weight: 700; color: var(--accent-2); }
+  .empty-state {
+    text-align: center; padding: 1.5rem; color: var(--text-muted); font-size: 0.88rem;
+    border: 1px dashed var(--border-2); border-radius: 12px;
+  }
+  .social-row { display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.85rem; }
+  .social-icon {
+    width: 36px; height: 36px; border-radius: 10px; background: var(--bg-3);
+    border: 1px solid var(--border-2); display: flex; align-items: center; justify-content: center;
+    font-size: 0.95rem; flex-shrink: 0;
+  }
+  .social-row input { flex: 1; }
+  .profile-chip {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    background: var(--bg-3); border: 1px solid var(--border-2);
+    border-radius: 99px; padding: 0.35rem 0.85rem; font-size: 0.8rem; color: var(--text-muted);
+    margin-top: 0.75rem;
+  }
+  .btn-row { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 1rem; }
 </style>
 
-<div class="settings-wrap">
-  <h2>Account Settings</h2>
+<div class="settings-shell">
+  <div class="settings-header">
+    <h1>Account Settings</h1>
+    <p>Manage your profile, credits, billing, and connected accounts.</p>
+  </div>
 
-  {% if success %}
-  <div class="alert-success-bar">{{ success }}</div>
-  {% endif %}
-  {% if error %}
-  <div class="alert-error-bar">{{ error }}</div>
-  {% endif %}
+  {% if success %}<div class="alert-success-bar">{{ success }}</div>{% endif %}
+  {% if error %}<div class="alert-error-bar">{{ error }}</div>{% endif %}
 
-  <!-- Account summary -->
-  <div class="settings-card" style="padding:1.25rem 1.75rem;">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-      <div>
-        <div style="font-weight:700;font-size:1.05rem;">{{ user.username }}</div>
-        <div style="color:var(--text-muted);font-size:0.8rem;">
-          Member since {{ (user.created_at or '')[:10] or '—' }}
-          {% if user.images_today is defined %} · {{ user.images_today }} images today{% endif %}
+  <div class="settings-layout">
+    <nav class="settings-nav" id="settings-nav">
+      <a href="#personal" data-tab="personal" class="active"><span class="nav-icon">👤</span> Personal Info</a>
+      <a href="#account" data-tab="account"><span class="nav-icon">🔑</span> Username & Email</a>
+      <a href="#social" data-tab="social"><span class="nav-icon">🔗</span> Social Profiles</a>
+      <a href="#billing" data-tab="billing"><span class="nav-icon">💳</span> Credits & Billing</a>
+      <a href="#security" data-tab="security"><span class="nav-icon">🛡️</span> Password</a>
+    </nav>
+
+    <div class="settings-panels">
+
+      <!-- Personal Info -->
+      <section class="settings-panel active" id="panel-personal">
+        <div class="settings-card">
+          <h3>Personal Information</h3>
+          <p class="sub">Your name and date of birth used for your account profile.</p>
+          <form method="POST">
+            <input type="hidden" name="action" value="personal">
+            <input type="hidden" name="tab" value="personal">
+            <div class="mb-3">
+              <label class="form-label-sm">Full Name</label>
+              <input type="text" name="display_name" class="form-control-dark"
+                value="{{ user.display_name or '' }}" placeholder="Your name">
+            </div>
+            <div class="mb-4">
+              <label class="form-label-sm">Date of Birth</label>
+              <input type="date" name="birthday" class="form-control-dark" value="{{ user.birthday or '' }}">
+              <span class="form-hint">Must be 18+ for age-restricted content.</span>
+            </div>
+            <button type="submit" class="btn btn-accent">Save Personal Info</button>
+          </form>
+          <div class="profile-chip">
+            Member since {{ (user.created_at or '')[:10] or '—' }}
+            {% if user.images_today is defined %} · {{ user.images_today }} images generated today{% endif %}
+          </div>
         </div>
-      </div>
-      <a href="/dashboard" class="btn btn-outline-accent btn-sm">View Dashboard</a>
+      </section>
+
+      <!-- Username & Email -->
+      <section class="settings-panel" id="panel-account">
+        <div class="settings-card">
+          <h3>Username & Email</h3>
+          <p class="sub">How you log in and how we reach you for receipts and support.</p>
+          <form method="POST">
+            <input type="hidden" name="action" value="account">
+            <input type="hidden" name="tab" value="account">
+            <div class="mb-3">
+              <label class="form-label-sm">Username</label>
+              <input type="text" name="username" class="form-control-dark"
+                value="{{ user.username }}" pattern="[a-zA-Z0-9_]{3,24}" required>
+              <span class="form-hint">3–24 characters. Letters, numbers, and underscores only.</span>
+            </div>
+            <div class="mb-4">
+              <label class="form-label-sm">Email Address</label>
+              <input type="email" name="email" class="form-control-dark"
+                value="{{ user.email or '' }}" placeholder="you@email.com" required>
+              <span class="form-hint">Used for billing receipts and account recovery.</span>
+            </div>
+            <button type="submit" class="btn btn-accent">Save Account Details</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- Social Profiles -->
+      <section class="settings-panel" id="panel-social">
+        <div class="settings-card">
+          <h3>Social Profiles</h3>
+          <p class="sub">Link your social accounts — enter a handle or full URL. OAuth connect coming soon.</p>
+          <form method="POST">
+            <input type="hidden" name="action" value="social">
+            <input type="hidden" name="tab" value="social">
+
+            <div class="social-row">
+              <div class="social-icon">𝕏</div>
+              <input type="text" name="social_twitter" class="form-control-dark"
+                value="{{ user.social_twitter or '' }}" placeholder="@username or profile URL">
+            </div>
+            <div class="social-row">
+              <div class="social-icon">📷</div>
+              <input type="text" name="social_instagram" class="form-control-dark"
+                value="{{ user.social_instagram or '' }}" placeholder="@username or profile URL">
+            </div>
+            <div class="social-row">
+              <div class="social-icon">🎵</div>
+              <input type="text" name="social_tiktok" class="form-control-dark"
+                value="{{ user.social_tiktok or '' }}" placeholder="@username or profile URL">
+            </div>
+            <div class="social-row">
+              <div class="social-icon">▶️</div>
+              <input type="text" name="social_youtube" class="form-control-dark"
+                value="{{ user.social_youtube or '' }}" placeholder="@channel or channel URL">
+            </div>
+            <div class="social-row">
+              <div class="social-icon">🌐</div>
+              <input type="text" name="social_website" class="form-control-dark"
+                value="{{ user.social_website or '' }}" placeholder="yourwebsite.com">
+            </div>
+
+            <button type="submit" class="btn btn-accent mt-2">Save Social Profiles</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- Credits & Billing -->
+      <section class="settings-panel" id="panel-billing">
+        <div class="settings-card">
+          <h3>Your Credits</h3>
+          <p class="sub">Current balance for PercfectStudios image and video generation.</p>
+          <div class="credit-hero">
+            <div class="credit-box">
+              <div class="cval">{{ user.picture_credits or 0 }}</div>
+              <div class="clabel">Image Credits</div>
+            </div>
+            <div class="credit-box">
+              <div class="cval">{{ user.video_credits or 0 }}</div>
+              <div class="clabel">Video Seconds</div>
+            </div>
+          </div>
+          <div class="btn-row">
+            <a href="/buy-credits" class="btn btn-accent">Buy More Credits</a>
+            <a href="/percfectstudios" class="btn btn-outline-accent">Go to Studio</a>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <h3>Payment Methods</h3>
+          <p class="sub">Cards saved through Stripe checkout appear here. Manage or add cards in the billing portal.</p>
+
+          {% if billing.cards %}
+            {% for card in billing.cards %}
+            <div class="card-row">
+              <div>
+                <div class="brand">{{ card.brand }} ···· {{ card.last4 }}</div>
+                <div class="meta">Expires {{ card.exp }}</div>
+              </div>
+              <span style="color:var(--success);font-size:0.8rem;font-weight:600;">Linked</span>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty-state">
+              No saved cards yet.<br>
+              Buy credits once and your card will be linked for faster checkout.
+            </div>
+          {% endif %}
+
+          <div class="btn-row">
+            <a href="/settings/billing-portal" class="btn btn-outline-accent">Manage Cards & Billing</a>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <h3>Billing History</h3>
+          <p class="sub">Recent credit purchases through PercfectAI.</p>
+          {% if billing.payments %}
+            {% for pay in billing.payments %}
+            <div class="pay-row">
+              <div>
+                <div>{{ pay.package }}</div>
+                <div style="color:var(--text-muted);font-size:0.78rem;">{{ pay.date }}</div>
+              </div>
+              <div class="amt">{{ pay.amount }}</div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty-state">No purchases yet.</div>
+          {% endif %}
+        </div>
+      </section>
+
+      <!-- Password -->
+      <section class="settings-panel" id="panel-security">
+        <div class="settings-card">
+          <h3>Password & Security</h3>
+          <p class="sub">Change your password. Use 8+ characters with mixed case, numbers, and symbols.</p>
+          <form method="POST">
+            <input type="hidden" name="action" value="password">
+            <input type="hidden" name="tab" value="security">
+            <div class="mb-3">
+              <label class="form-label-sm">Current Password</label>
+              <input type="password" name="current_password" class="form-control-dark" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label-sm">New Password</label>
+              <input type="password" name="new_password" class="form-control-dark" required>
+            </div>
+            <div class="mb-4">
+              <label class="form-label-sm">Confirm New Password</label>
+              <input type="password" name="confirm_password" class="form-control-dark" required>
+            </div>
+            <button type="submit" class="btn btn-accent">Update Password</button>
+          </form>
+        </div>
+
+        <div class="settings-card">
+          <h3>Support</h3>
+          <p class="sub">Need help with credits, billing, or your account?</p>
+          <a href="mailto:support@percfectai.com" class="btn btn-outline-accent btn-sm">Email support@percfectai.com</a>
+        </div>
+
+        <div style="text-align:center;margin-top:0.5rem;">
+          <a href="/logout" style="color:var(--text-muted);font-size:0.85rem;">Log out</a>
+        </div>
+      </section>
+
     </div>
-  </div>
-
-  <!-- Credits -->
-  <div class="settings-card">
-    <div class="settings-section-title">Your Credits</div>
-    <div class="credit-grid">
-      <div class="credit-box">
-        <div class="cval">{{ user.picture_credits or 0 }}</div>
-        <div class="clabel">Image Credits</div>
-      </div>
-      <div class="credit-box">
-        <div class="cval">{{ user.video_credits or 0 }}</div>
-        <div class="clabel">Video Credits</div>
-      </div>
-    </div>
-    <a href="/buy-credits" class="btn btn-accent w-100">Buy More Credits</a>
-  </div>
-
-  <!-- Profile -->
-  <div class="settings-card">
-    <div class="settings-section-title">Profile</div>
-    <form method="POST">
-      <input type="hidden" name="action" value="profile">
-      <div class="mb-3">
-        <label class="form-label-sm">Username</label>
-        <input type="text" class="form-control-dark" value="{{ user.username }}" disabled>
-        <small style="color:var(--text-muted);font-size:0.75rem;">Cannot be changed.</small>
-      </div>
-      <div class="mb-3">
-        <label class="form-label-sm">Email</label>
-        <input type="email" name="email" class="form-control-dark" value="{{ user.email or '' }}" placeholder="your@email.com">
-      </div>
-      <div class="mb-4">
-        <label class="form-label-sm">Date of Birth</label>
-        <input type="date" name="birthday" class="form-control-dark" value="{{ user.birthday or '' }}">
-        <small style="color:var(--text-muted);font-size:0.75rem;">Required for age-restricted content.</small>
-      </div>
-      <button type="submit" class="btn btn-accent w-100">Save Profile</button>
-    </form>
-  </div>
-
-  <!-- Password -->
-  <div class="settings-card">
-    <div class="settings-section-title">Change Password</div>
-    <form method="POST">
-      <input type="hidden" name="action" value="password">
-      <div class="mb-3">
-        <label class="form-label-sm">Current Password</label>
-        <input type="password" name="current_password" class="form-control-dark" placeholder="••••••••" required>
-      </div>
-      <div class="mb-3">
-        <label class="form-label-sm">New Password</label>
-        <input type="password" name="new_password" class="form-control-dark" placeholder="••••••••" required>
-      </div>
-      <div class="mb-4">
-        <label class="form-label-sm">Confirm New Password</label>
-        <input type="password" name="confirm_password" class="form-control-dark" placeholder="••••••••" required>
-      </div>
-      <button type="submit" class="btn btn-accent w-100">Update Password</button>
-    </form>
-  </div>
-
-  <!-- Support -->
-  <div class="settings-card">
-    <div class="settings-section-title">Support</div>
-    <a href="mailto:support@percfectai.com" class="support-link">
-      <span class="sicon">✉️</span>
-      <div>
-        Email Support
-        <small>support@percfectai.com — we reply within 24h</small>
-      </div>
-    </a>
-    <a href="/percfectstudios" class="support-link">
-      <span class="sicon">⬡</span>
-      <div>
-        Go to Studio
-        <small>Generate images & videos</small>
-      </div>
-    </a>
-    <a href="/percfectprincesses" class="support-link">
-      <span class="sicon">👑</span>
-      <div>
-        Percfect Princesses
-        <small>Free AI princess generator</small>
-      </div>
-    </a>
-  </div>
-
-  <!-- Danger zone -->
-  <div style="text-align:center;margin-top:1.5rem;">
-    <a href="/logout" style="color:var(--text-muted);font-size:0.85rem;text-decoration:none;">Log out</a>
   </div>
 </div>
+
+<script>
+(function() {
+  const nav = document.getElementById('settings-nav');
+  const panels = document.querySelectorAll('.settings-panel');
+  const initial = '{{ active_tab }}' || (location.hash || '#personal').slice(1);
+
+  function showTab(tab) {
+    nav.querySelectorAll('a').forEach(a => a.classList.toggle('active', a.dataset.tab === tab));
+    panels.forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
+    history.replaceState(null, '', '#'+tab);
+  }
+
+  nav.addEventListener('click', e => {
+    const link = e.target.closest('a[data-tab]');
+    if (!link) return;
+    e.preventDefault();
+    showTab(link.dataset.tab);
+  });
+
+  showTab(initial in ['personal','account','social','billing','security'] ? initial : 'personal');
+})();
+</script>
 {% endblock %}

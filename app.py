@@ -387,42 +387,200 @@ def dashboard():
 
 
 # ── Account Settings ─────────────────────────────────────
+SETTINGS_USER_FIELDS = (
+    "username,email,display_name,birthday,picture_credits,video_credits,"
+    "images_today,videos_today,created_at,stripe_customer_id,"
+    "social_twitter,social_instagram,social_tiktok,social_youtube,social_website"
+)
+
+
+def _safe_user_update(user_id, updates: dict):
+    payload = dict(updates)
+    while payload:
+        try:
+            supabase.table("users").update(payload).eq("id", user_id).execute()
+            return True, payload
+        except Exception:
+            optional = (
+                "is_adult", "display_name", "stripe_customer_id",
+                "social_twitter", "social_instagram", "social_tiktok",
+                "social_youtube", "social_website",
+            )
+            removed = False
+            for key in optional:
+                if key in payload:
+                    payload.pop(key)
+                    removed = True
+                    break
+            if not removed:
+                raise
+    return False, {}
+
+
+def _normalize_social(field: str, value: str) -> str:
+    value = (value or "").strip()
+    if not value:
+        return ""
+    if field == "social_website" and not value.startswith(("http://", "https://")):
+        value = f"https://{value}"
+    if field.startswith("social_") and field != "social_website":
+        handle = value.lstrip("@").split("/")[-1].split("?")[0]
+        prefixes = {
+            "social_twitter": "https://x.com/",
+            "social_instagram": "https://instagram.com/",
+            "social_tiktok": "https://tiktok.com/@",
+            "social_youtube": "https://youtube.com/@",
+        }
+        if value.startswith("http"):
+            return value
+        return prefixes.get(field, "") + handle
+    return value
+
+
+def _load_settings_user(user_id):
+    try:
+        res = supabase.table("users").select(SETTINGS_USER_FIELDS).eq("id", user_id).single().execute()
+        return res.data or {}
+    except Exception:
+        res = supabase.table("users").select(
+            "username,email,birthday,picture_credits,video_credits,images_today,videos_today,created_at"
+        ).eq("id", user_id).single().execute()
+        return res.data or {}
+
+
+def _ensure_stripe_customer(user_data: dict):
+    if not stripe.api_key:
+        return None
+    existing = user_data.get("stripe_customer_id")
+    if existing:
+        return existing
+    try:
+        customer = stripe.Customer.create(
+            email=user_data.get("email") or None,
+            name=user_data.get("display_name") or user_data.get("username"),
+            metadata={"user_id": str(current_user.id)},
+        )
+        _safe_user_update(current_user.id, {"stripe_customer_id": customer.id})
+        return customer.id
+    except Exception:
+        return None
+
+
+def _get_billing_info(stripe_customer_id):
+    info = {"cards": [], "payments": [], "portal_available": bool(stripe.api_key)}
+    if not stripe_customer_id or not stripe.api_key:
+        return info
+    try:
+        methods = stripe.PaymentMethod.list(customer=stripe_customer_id, type="card", limit=5)
+        for pm in methods.data:
+            card = pm.card
+            info["cards"].append({
+                "brand": (card.brand or "card").title(),
+                "last4": card.last4,
+                "exp": f"{card.exp_month:02d}/{str(card.exp_year)[-2:]}",
+            })
+    except Exception:
+        pass
+    try:
+        sessions = stripe.checkout.Session.list(customer=stripe_customer_id, limit=8)
+        for s in sessions.data:
+            if s.payment_status != "paid":
+                continue
+            pkg = CREDIT_PACKAGES.get((s.metadata or {}).get("package", ""), {})
+            info["payments"].append({
+                "date": datetime.datetime.fromtimestamp(s.created, datetime.timezone.utc).strftime("%b %d, %Y"),
+                "amount": f"${s.amount_total / 100:.2f}",
+                "package": pkg.get("name", "Credit purchase"),
+            })
+    except Exception:
+        pass
+    return info
+
+
+@app.route("/settings/billing-portal")
+@login_required
+def settings_billing_portal():
+    user_data = _load_settings_user(current_user.id)
+    customer_id = _ensure_stripe_customer(user_data)
+    if not customer_id:
+        flash("Billing is not available right now. Please try again later.", "danger")
+        return redirect(url_for("account_settings") + "#billing")
+
+    base_url = request.host_url.rstrip("/")
+    try:
+        portal = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=f"{base_url}/settings#billing",
+        )
+        return redirect(portal.url, code=303)
+    except Exception:
+        flash("Could not open billing portal. Enable Stripe Customer Portal in your Stripe dashboard.", "danger")
+        return redirect(url_for("account_settings") + "#billing")
+
+
 @app.route("/settings", methods=["GET", "POST"])
 @login_required
 def account_settings():
-    res = supabase.table("users").select(
-        "username,email,birthday,picture_credits,video_credits,images_today,videos_today,created_at"
-    ).eq("id", current_user.id).single().execute()
-    user_data = res.data or {}
+    user_data = _load_settings_user(current_user.id)
     success = None
     error = None
+    active_tab = request.args.get("tab", "personal")
 
     if request.method == "POST":
         action = request.form.get("action")
+        active_tab = request.form.get("tab", active_tab)
 
-        if action == "profile":
-            email = request.form.get("email", "").strip().lower()
+        if action == "personal":
+            display_name = request.form.get("display_name", "").strip()
             birthday = request.form.get("birthday", "").strip()
             updates = {}
-            if email:
-                updates["email"] = email
+            if display_name:
+                updates["display_name"] = display_name[:80]
             if birthday:
                 updates["birthday"] = birthday
-                try:
-                    updates["is_adult"] = _user_is_adult(birthday)
-                except Exception:
-                    pass
+                updates["is_adult"] = _user_is_adult(birthday)
             if updates:
-                try:
-                    supabase.table("users").update(updates).eq("id", current_user.id).execute()
-                except Exception:
-                    updates.pop("is_adult", None)
-                    if updates:
-                        supabase.table("users").update(updates).eq("id", current_user.id).execute()
+                _safe_user_update(current_user.id, updates)
                 user_data.update(updates)
-                success = "Profile updated."
+                success = "Personal info saved."
             else:
                 error = "Nothing to update."
+
+        elif action == "account":
+            import re
+            email = request.form.get("email", "").strip().lower()
+            username = request.form.get("username", "").strip()
+            updates = {}
+            if email:
+                if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+                    error = "Enter a valid email address."
+                else:
+                    dup = supabase.table("users").select("id").eq("email", email).neq("id", current_user.id).execute()
+                    if dup.data:
+                        error = "That email is already in use."
+                    else:
+                        updates["email"] = email
+            if not error and username and username != user_data.get("username"):
+                if not re.match(r'^[a-zA-Z0-9_]{3,24}$', username):
+                    error = "Username must be 3–24 characters (letters, numbers, underscore)."
+                else:
+                    dup = supabase.table("users").select("id").eq("username", username).execute()
+                    if dup.data:
+                        error = "That username is already taken."
+                    else:
+                        updates["username"] = username
+            if not error and updates:
+                _safe_user_update(current_user.id, updates)
+                user_data.update(updates)
+                success = "Account details saved."
+
+        elif action == "social":
+            updates = {}
+            for field in ("social_twitter", "social_instagram", "social_tiktok", "social_youtube", "social_website"):
+                updates[field] = _normalize_social(field, request.form.get(field, ""))
+            _safe_user_update(current_user.id, updates)
+            user_data.update(updates)
+            success = "Social profiles saved."
 
         elif action == "password":
             pw_res = supabase.table("users").select("password").eq("id", current_user.id).single().execute()
@@ -440,7 +598,16 @@ def account_settings():
                 supabase.table("users").update({"password": generate_password_hash(new_pw)}).eq("id", current_user.id).execute()
                 success = "Password updated."
 
-    return render_template("settings.html", user=user_data, success=success, error=error)
+    billing = _get_billing_info(user_data.get("stripe_customer_id"))
+    return render_template(
+        "settings.html",
+        user=user_data,
+        billing=billing,
+        packages=CREDIT_PACKAGES,
+        success=success,
+        error=error,
+        active_tab=active_tab,
+    )
 
 
 # ── PercfectStudios ───────────────────────────────────────
@@ -571,18 +738,25 @@ def create_checkout_session():
         flash("Invalid package.", "danger")
         return redirect(url_for("buy_credits"))
 
+    user_data = _load_settings_user(current_user.id)
+    customer_id = _ensure_stripe_customer(user_data)
     base_url = request.host_url.rstrip("/")
-    session = stripe.checkout.Session.create(
-        payment_method_types=["card"],
-        line_items=[{"price": pkg["price_id"], "quantity": 1}],
-        mode="payment",
-        success_url=f"{base_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}",
-        cancel_url=f"{base_url}/buy-credits",
-        metadata={
+    checkout_kwargs = {
+        "payment_method_types": ["card"],
+        "line_items": [{"price": pkg["price_id"], "quantity": 1}],
+        "mode": "payment",
+        "success_url": f"{base_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}",
+        "cancel_url": f"{base_url}/buy-credits",
+        "metadata": {
             "user_id": str(current_user.id),
             "package": package_key,
         },
-    )
+    }
+    if customer_id:
+        checkout_kwargs["customer"] = customer_id
+    elif user_data.get("email"):
+        checkout_kwargs["customer_email"] = user_data["email"]
+    session = stripe.checkout.Session.create(**checkout_kwargs)
     return redirect(session.url, code=303)
 
 
@@ -595,6 +769,8 @@ def payment_success():
 
     session = stripe.checkout.Session.retrieve(session_id)
     if session.payment_status == "paid" and str(session.metadata.get("user_id")) == str(current_user.id):
+        if session.customer:
+            _safe_user_update(current_user.id, {"stripe_customer_id": session.customer})
         pkg = CREDIT_PACKAGES.get(session.metadata.get("package"))
         if pkg:
             res = supabase.table("users").select("picture_credits,video_credits").eq("id", current_user.id).single().execute()
@@ -605,7 +781,7 @@ def payment_success():
             flash(f"Payment successful! Added {pkg['image_credits']} image credits"
                   + (f" and {pkg['video_credits']} video credits" if pkg["video_credits"] else "") + ".", "success")
 
-    return redirect(url_for("dashboard"))
+    return redirect(url_for("account_settings") + "#billing")
 
 
 @app.route("/webhook", methods=["POST"])

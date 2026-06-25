@@ -21,9 +21,16 @@ create table if not exists users (
 
 -- Run these if upgrading an existing database:
 alter table users add column if not exists email text;
+alter table users add column if not exists display_name text;
 alter table users add column if not exists is_adult boolean default false;
 alter table users add column if not exists signup_ip text;
 alter table users add column if not exists is_admin boolean default false;
+alter table users add column if not exists stripe_customer_id text;
+alter table users add column if not exists social_twitter text;
+alter table users add column if not exists social_instagram text;
+alter table users add column if not exists social_tiktok text;
+alter table users add column if not exists social_youtube text;
+alter table users add column if not exists social_website text;
 update users set is_adult = true where birthday is not null and birthday <> '' and birthday::date <= (current_date - interval '18 years');
 
 -- Allow guest princess generations in history (optional)
