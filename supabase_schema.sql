@@ -4,7 +4,11 @@ create table if not exists users (
   id               bigserial primary key,
   username         text unique not null,
   password         text not null,
+  email            text,
   birthday         text,
+  is_adult         boolean default false,
+  signup_ip        text,
+  is_admin         boolean default false,
   api_key1         text unique,
   api_key2         text unique,
   images_today     int default 0,
@@ -14,6 +18,13 @@ create table if not exists users (
   video_credits    int default 0,
   created_at       timestamptz default now()
 );
+
+-- Run these if upgrading an existing database:
+alter table users add column if not exists email text;
+alter table users add column if not exists is_adult boolean default false;
+alter table users add column if not exists signup_ip text;
+alter table users add column if not exists is_admin boolean default false;
+update users set is_adult = true where birthday is not null and birthday <> '' and birthday::date <= (current_date - interval '18 years');
 
 create table if not exists generations (
   id          bigserial primary key,
