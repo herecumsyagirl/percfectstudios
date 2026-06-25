@@ -146,6 +146,14 @@
             <p class="ph-text">Your video will appear here</p>
           </div>
           <div class="shimmer-overlay" id="vid-shimmer"></div>
+          <!-- Video progress bar -->
+          <div id="vid-progress-wrap" style="display:none;padding:1.5rem 1rem;text-align:center;">
+            <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.75rem;" id="vid-progress-label">Generating video… <span id="vid-elapsed">0</span>s</div>
+            <div style="background:var(--bg-3);border-radius:99px;height:6px;overflow:hidden;max-width:320px;margin:0 auto;">
+              <div id="vid-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:99px;transition:width 1s linear;"></div>
+            </div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">Usually takes 60–120 seconds</div>
+          </div>
           <video id="vid-result" controls loop playsinline></video>
         </div>
 
@@ -386,10 +394,13 @@ async function _generateImage() {
   finally { setLoading('img', false); }
 }
 
+let _vidTimer = null;
+
 async function _generateVideo() {
   const prompt = document.getElementById('vid-prompt').value.trim();
   if (!prompt) { showError('vid','Please describe what you want to generate.'); return; }
   setLoading('vid', true);
+  startVideoProgress();
   const fd = new FormData();
   fd.append('prompt', prompt);
   fd.append('duration', _duration || 5);
@@ -404,12 +415,33 @@ async function _generateVideo() {
     vid.src = data.url;
     vid.style.display = 'block';
     document.getElementById('vid-placeholder').style.display = 'none';
+    document.getElementById('vid-progress-wrap').style.display = 'none';
     document.getElementById('vid-download').href = data.url;
     document.getElementById('vid-actions').style.display = 'flex';
     const el = document.getElementById('vid-credits');
-    if (el) el.textContent = Math.max(0, parseInt(el.textContent)-1);
+    if (el) el.textContent = Math.max(0, parseInt(el.textContent) - (_duration||5));
   } catch(e) { showError('vid','Network error — please try again.'); }
-  finally { setLoading('vid', false); }
+  finally { setLoading('vid', false); stopVideoProgress(); }
+}
+
+function startVideoProgress() {
+  let elapsed = 0;
+  const MAX = 120;
+  document.getElementById('vid-progress-wrap').style.display = 'block';
+  document.getElementById('vid-elapsed').textContent = '0';
+  document.getElementById('vid-progress-bar').style.width = '0%';
+  _vidTimer = setInterval(() => {
+    elapsed++;
+    document.getElementById('vid-elapsed').textContent = elapsed;
+    const pct = Math.min(95, (elapsed / MAX) * 100);
+    document.getElementById('vid-progress-bar').style.width = pct + '%';
+    if (elapsed > MAX) document.getElementById('vid-progress-label').innerHTML = 'Almost there… <span id="vid-elapsed">' + elapsed + '</span>s';
+  }, 1000);
+}
+
+function stopVideoProgress() {
+  if (_vidTimer) { clearInterval(_vidTimer); _vidTimer = null; }
+  document.getElementById('vid-progress-bar').style.width = '100%';
 }
 
 function sendToVideo() {
