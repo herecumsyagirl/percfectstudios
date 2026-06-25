@@ -1,1 +1,1 @@
-# Repository add-on
+# Repository add-on (no runtime logic required)

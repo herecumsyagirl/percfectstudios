@@ -1,11 +1,6 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <settings>
   <category label="Account">
-    <setting id="api_key" type="text" label="API Key" default="" />
-    <setting id="username" type="text" label="Username" default="" />
-  </category>
-  <category label="Storage">
-    <setting id="save_folder" type="folder" label="Save generations to" default="special://profile/addon_data/plugin.video.percfectstudios/generations/" />
-    <setting id="auto_save" type="bool" label="Auto-save after generation" default="true" />
+    <setting id="api_key" type="text" label="API Key" default=""/>
   </category>
 </settings>

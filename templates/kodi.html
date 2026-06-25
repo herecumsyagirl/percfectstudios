@@ -1,218 +1,60 @@
 {% extends "base.html" %}
-{% block title %}PercfectStudios for Kodi & Fire Stick{% endblock %}
+{% block title %}PercfectStudios Kodi — Fire Stick{% endblock %}
 
 {% block content %}
 <div class="container">
 
-  <!-- Hero -->
   <div class="kodi-hero">
-    <div class="kodi-badge">🔥 Fire Stick Ready</div>
-    <h1>Percfect<span style="color:var(--accent)">Studios</span><br>for Kodi</h1>
-    <p class="kodi-subtitle">Generate AI images &amp; videos directly on your TV.<br>Powered by xAI Aurora — available as a Kodi add-on.</p>
-
-    <div class="kodi-actions">
-      <a href="https://herecumsyagirl.github.io/percfectai-kodi/" class="btn btn-accent btn-lg px-5 py-3">
-        GitHub (Kodi Add Source)
-      </a>
-      <a href="https://github.com/herecumsyagirl/percfectai-kodi/raw/main/repository.zip" class="btn btn-outline-accent btn-lg px-5 py-3">
-        Downloader URL
-      </a>
-      <a href="/percfectstudios" class="btn btn-outline-accent btn-lg px-5 py-3">
-        🌐 Use in Browser
-      </a>
-    </div>
-
-    <div class="kodi-stats">
-      <span>Kodi 19+ (Matrix)</span>
-      <span class="sep">·</span>
-      <span>Fire Stick / Android TV</span>
-      <span class="sep">·</span>
-      <span>Python 3</span>
-      <span class="sep">·</span>
-      <span>Free to install</span>
-    </div>
+    <h1>Install on Fire Stick</h1>
+    <p class="kodi-subtitle">Crew-style. Type the <strong>full</strong> URL including <strong>https://</strong></p>
   </div>
 
-  <!-- Feature cards -->
-  <div class="row g-4 mb-5">
-    <div class="col-md-4">
-      <div class="kodi-feature-card">
-        <div class="kodi-icon">🖼</div>
-        <h5>Image Generation</h5>
-        <p>Type a prompt with your remote or keyboard, get stunning AI art on your TV in seconds.</p>
-      </div>
-    </div>
-    <div class="col-md-4">
-      <div class="kodi-feature-card featured">
-        <div class="kodi-icon">🎬</div>
-        <h5>Video Generation</h5>
-        <p>Generate cinematic AI videos and play them instantly on your big screen.</p>
-      </div>
-    </div>
-    <div class="col-md-4">
-      <div class="kodi-feature-card">
-        <div class="kodi-icon">📁</div>
-        <h5>Your Gallery</h5>
-        <p>Browse everything you've ever created — all your generations, right in Kodi.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Install guide — Method A: The Crew style -->
   <div class="kodi-section mb-5">
-    <h2 class="kodi-section-title">Method A — Inside Kodi (like The Crew)</h2>
-    <p style="color:var(--text-muted);margin-bottom:1.5rem;">Recommended. No Downloader needed.</p>
+    <h2 class="kodi-section-title">4 steps</h2>
 
-    <div class="row g-3 mt-1">
-
-      <div class="col-md-6">
-        <div class="install-step">
-          <div class="step-num">01</div>
-          <div>
-            <strong>Enable Unknown Sources</strong>
-            <p>Settings → My Fire TV → Developer Options → Apps from Unknown Sources → On</p>
-          </div>
-        </div>
+    <div class="install-step mb-3">
+      <div class="step-num">1</div>
+      <div>
+        <strong>File manager → Add source</strong><br>
+        Click <code>&lt;None&gt;</code> and type this <em>entire</em> line:<br>
+        <div class="url-chip" style="font-size:1.15rem;">https://herecumsyagirl.github.io/percfectai-kodi/</div>
+        <small class="text-muted">Must start with https:// — Kodi will say "no directory" without it</small><br>
+        Name: <strong>Percfect</strong>
       </div>
+    </div>
 
-      <div class="col-md-6">
-        <div class="install-step">
-          <div class="step-num">02</div>
-          <div>
-            <strong>Install Kodi</strong>
-            <p>Amazon Appstore → install <strong>Kodi</strong>.</p>
-          </div>
-        </div>
+    <div class="install-step mb-3">
+      <div class="step-num">2</div>
+      <div>
+        <strong>Install repo zip</strong><br>
+        Add-ons → Install from zip → Percfect → <strong>repository.percfectai-1.0.9.zip</strong>
       </div>
+    </div>
 
-      <div class="col-md-6">
-        <div class="install-step">
-          <div class="step-num">03</div>
-          <div>
-            <strong>Add Source (File Manager)</strong>
-            <p>Kodi → Settings (gear) → <strong>File Manager</strong> → <strong>Add Source</strong></p>
-            <p>Type exactly:</p>
-            <div class="url-chip">herecumsyagirl.github.io/percfectai-kodi</div>
-            <p style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-muted);">Name it <strong>PercfectAI</strong> → OK</p>
-          </div>
-        </div>
+    <div class="install-step mb-3">
+      <div class="step-num">3</div>
+      <div>
+        <strong>Install add-on</strong><br>
+        Install from repository → PercfectAI Repository → PercfectStudios
       </div>
+    </div>
 
-      <div class="col-md-6">
-        <div class="install-step">
-          <div class="step-num">04</div>
-          <div>
-            <strong>Install repo zip from source</strong>
-            <p>Add-ons → box icon → <strong>Install from zip file</strong> → <strong>PercfectAI</strong></p>
-            <p>Select <strong>repository.percfectai-1.0.2.zip</strong></p>
-          </div>
-        </div>
+    <div class="install-step mb-3">
+      <div class="step-num">4</div>
+      <div>
+        <strong>API key</strong> in Settings<br>
+        <code>e0b61d4a-ead2-4a43-b439-b79db701b6c2</code>
       </div>
-
-      <div class="col-md-6">
-        <div class="install-step">
-          <div class="step-num">05</div>
-          <div>
-            <strong>Install from repository</strong>
-            <p>Box icon → <strong>Install from repository</strong> → PercfectAI Repository → Video add-ons → <strong>PercfectStudios</strong> → Install</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-md-6">
-        <div class="install-step">
-          <div class="step-num">06</div>
-          <div>
-            <strong>Connect your TV</strong>
-            <p>Open PercfectStudios → Scan QR with your phone to sign up free (10 images + 6s video).</p>
-          </div>
-        </div>
-      </div>
-
     </div>
   </div>
 
-  <!-- Install guide — Method B: Downloader -->
-  <div class="kodi-section mb-5">
-    <h2 class="kodi-section-title">Method B — Downloader app</h2>
-    <p style="color:var(--text-muted);margin-bottom:1.5rem;">Alternative if File Manager method fails.</p>
-
-    <div class="row g-3 mt-1">
-
-      <div class="col-md-6">
-        <div class="install-step">
-          <div class="step-num">01</div>
-          <div>
-            <strong>Install Downloader</strong>
-            <p>Amazon Appstore → install <strong>Downloader</strong> (free, by AFTVnews).</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-md-6">
-        <div class="install-step">
-          <div class="step-num">02</div>
-          <div>
-            <strong>Download repo zip</strong>
-            <p>Downloader → URL bar → type exactly:</p>
-            <div class="url-chip">github.com/herecumsyagirl/percfectai-kodi/raw/main/repository.zip</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-md-6">
-        <div class="install-step">
-          <div class="step-num">03</div>
-          <div>
-            <strong>Install zip in Kodi</strong>
-            <p>Kodi → Add-ons → box icon → <strong>Install from zip file</strong></p>
-            <p>Browse: <strong>storage</strong> → <strong>emulated</strong> → <strong>0</strong> → <strong>Downloader</strong> → <strong>repository.zip</strong></p>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-md-6">
-        <div class="install-step">
-          <div class="step-num">04</div>
-          <div>
-            <strong>Install PercfectStudios</strong>
-            <p>Box icon → <strong>Install from repository</strong> → PercfectAI Repository → Video add-ons → <strong>PercfectStudios</strong> → Install</p>
-          </div>
-        </div>
-      </div>
-
-    </div>
+  {% if api_key %}
+  <div class="api-key-display mt-3 mb-5">
+    <div class="api-key-label">Your API Key</div>
+    <div class="api-key-value" id="api-key-val">{{ api_key }}</div>
+    <button class="btn btn-outline-accent btn-sm mt-3" onclick="copyKey()">Copy</button>
   </div>
-
-  <!-- API Key section -->
-  <div class="kodi-section mb-5">
-    <h2 class="kodi-section-title">Your API Key</h2>
-    <p style="color:var(--text-muted);margin-top:0.5rem 0 1.5rem;">Optional fallback — paste into add-on settings if QR login does not work</p>
-
-    {% if api_key %}
-    <div class="api-key-display mt-3">
-      <div class="api-key-label">API Key</div>
-      <div class="api-key-value" id="api-key-val">{{ api_key }}</div>
-      <button class="btn btn-outline-accent btn-sm mt-3" onclick="copyKey()">Copy Key</button>
-      <span id="copy-confirm" style="display:none;margin-left:0.75rem;color:var(--success);font-size:0.85rem;">Copied!</span>
-    </div>
-    {% else %}
-    <div class="api-key-display mt-3" style="text-align:center;padding:2.5rem;">
-      <p style="color:var(--text-muted);margin-bottom:1rem;">Log in to see your API key</p>
-      <a href="/login" class="btn btn-accent">Log in</a>
-      <span style="margin:0 0.75rem;color:var(--text-muted)">or</span>
-      <a href="/register" class="btn btn-outline-accent">Create account</a>
-    </div>
-    {% endif %}
-  </div>
-
-  <!-- Download CTA -->
-  <div class="kodi-cta mb-5">
-    <h3>Quick install URLs</h3>
-    <p>Type these on your Fire Stick remote — apps add https:// automatically.</p>
-    <div class="url-chip" style="display:inline-block;margin:0.5rem 0.5rem 0 0;">herecumsyagirl.github.io/percfectai-kodi</div>
-    <div class="url-chip" style="display:inline-block;margin:0.5rem 0 0;">github.com/herecumsyagirl/percfectai-kodi/raw/main/repository.zip</div>
-  </div>
+  {% endif %}
 
 </div>
 {% endblock %}
@@ -220,12 +62,7 @@
 {% block scripts %}
 <script>
   function copyKey() {
-    const key = document.getElementById('api-key-val').textContent.trim();
-    navigator.clipboard.writeText(key).then(() => {
-      const c = document.getElementById('copy-confirm');
-      c.style.display = 'inline';
-      setTimeout(() => c.style.display = 'none', 2000);
-    });
+    navigator.clipboard.writeText(document.getElementById('api-key-val').textContent.trim());
   }
 </script>
 {% endblock %}

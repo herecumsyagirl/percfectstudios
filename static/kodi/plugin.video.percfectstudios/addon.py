@@ -129,12 +129,12 @@ def verify_pin():
 
 
 def get_save_folder():
-    folder = ADDON.getSetting('save_folder') or 'special://profile/addon_data/plugin.video.percfectstudios/generations/'
+    folder = 'special://profile/addon_data/plugin.video.percfectstudios/generations/'
     return xbmc.translatePath(folder)
 
 
 def should_auto_save():
-    return ADDON.getSetting('auto_save') != 'false'
+    return True
 
 
 def pick_image_file():
