@@ -325,6 +325,50 @@ def dashboard():
     return render_template("dashboard.html", user=user_data, generations=gens.data)
 
 
+# ── Account Settings ─────────────────────────────────────
+@app.route("/settings", methods=["GET", "POST"])
+@login_required
+def account_settings():
+    res = supabase.table("users").select("username,email,birthday").eq("id", current_user.id).single().execute()
+    user_data = res.data
+    success = None
+    error = None
+
+    if request.method == "POST":
+        action = request.form.get("action")
+
+        if action == "profile":
+            email = request.form.get("email", "").strip().lower()
+            birthday = request.form.get("birthday", "").strip()
+            updates = {}
+            if email:
+                updates["email"] = email
+            if birthday:
+                updates["birthday"] = birthday
+            if updates:
+                supabase.table("users").update(updates).eq("id", current_user.id).execute()
+                user_data.update(updates)
+                success = "Profile updated."
+            else:
+                error = "Nothing to update."
+
+        elif action == "password":
+            current_pw = request.form.get("current_password", "")
+            new_pw = request.form.get("new_password", "")
+            confirm_pw = request.form.get("confirm_password", "")
+            if not check_password_hash(user_data.get("password", ""), current_pw):
+                error = "Current password is incorrect."
+            elif len(new_pw) < 8:
+                error = "New password must be at least 8 characters."
+            elif new_pw != confirm_pw:
+                error = "Passwords don't match."
+            else:
+                supabase.table("users").update({"password": generate_password_hash(new_pw)}).eq("id", current_user.id).execute()
+                success = "Password updated."
+
+    return render_template("settings.html", user=user_data, success=success, error=error)
+
+
 # ── PercfectStudios ───────────────────────────────────────
 @app.route("/percfectstudios")
 def percfectstudios():

@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Account Settings · PercfectAI{% endblock %}
+{% block content %}
+<div class="container py-5" style="max-width:560px;">
+
+  <h2 style="font-weight:700;letter-spacing:-0.02em;margin-bottom:2rem;">Account Settings</h2>
+
+  {% if success %}
+  <div class="alert-success-bar">{{ success }}</div>
+  {% endif %}
+  {% if error %}
+  <div class="alert-error-bar">{{ error }}</div>
+  {% endif %}
+
+  <!-- Profile -->
+  <div class="settings-card mb-4">
+    <h5 class="settings-section-title">Profile</h5>
+    <form method="POST">
+      <input type="hidden" name="action" value="profile">
+
+      <div class="mb-3">
+        <label class="form-label-sm">Username</label>
+        <input type="text" class="form-control form-control-dark" value="{{ user.username }}" disabled>
+        <small class="text-muted">Username cannot be changed.</small>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label-sm">Email</label>
+        <input type="email" name="email" class="form-control form-control-dark" value="{{ user.email or '' }}" placeholder="your@email.com">
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label-sm">Date of Birth</label>
+        <input type="date" name="birthday" class="form-control form-control-dark" value="{{ user.birthday or '' }}">
+        <small class="text-muted">Required to access age-restricted content.</small>
+      </div>
+
+      <button type="submit" class="btn btn-accent w-100">Save Profile</button>
+    </form>
+  </div>
+
+  <!-- Password -->
+  <div class="settings-card">
+    <h5 class="settings-section-title">Change Password</h5>
+    <form method="POST">
+      <input type="hidden" name="action" value="password">
+
+      <div class="mb-3">
+        <label class="form-label-sm">Current Password</label>
+        <input type="password" name="current_password" class="form-control form-control-dark" placeholder="••••••••" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label-sm">New Password</label>
+        <input type="password" name="new_password" class="form-control form-control-dark" placeholder="••••••••" required>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label-sm">Confirm New Password</label>
+        <input type="password" name="confirm_password" class="form-control form-control-dark" placeholder="••••••••" required>
+      </div>
+
+      <button type="submit" class="btn btn-accent w-100">Update Password</button>
+    </form>
+  </div>
+
+</div>
+
+<style>
+  .settings-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border-2);
+    border-radius: 16px;
+    padding: 1.75rem;
+  }
+  .settings-section-title {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 1.25rem;
+    color: var(--text);
+  }
+  .form-label-sm {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .form-control-dark {
+    background: var(--surface-1);
+    border: 1px solid var(--border-2);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 0.6rem 0.9rem;
+    width: 100%;
+    font-size: 0.9rem;
+  }
+  .form-control-dark:focus {
+    outline: none;
+    border-color: var(--purple);
+    background: var(--surface-1);
+    color: var(--text);
+    box-shadow: 0 0 0 3px rgba(124,92,252,0.15);
+  }
+  .form-control-dark:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .alert-success-bar {
+    background: rgba(34,197,94,0.12);
+    border: 1px solid rgba(34,197,94,0.3);
+    color: #4ade80;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.25rem;
+    font-size: 0.9rem;
+  }
+  .alert-error-bar {
+    background: rgba(239,68,68,0.12);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: #f87171;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.25rem;
+    font-size: 0.9rem;
+  }
+</style>
+{% endblock %}
