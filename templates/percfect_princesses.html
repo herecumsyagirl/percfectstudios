@@ -108,30 +108,13 @@
 </div>
 
 <div class="pp-frame-wrap">
-  {% if not current_user.is_authenticated %}
-    {# Not logged in — show the generator freely, no age gate needed for SFW content #}
-    <iframe
-      src="https://perchance.org/9ujldjgr1f"
-      title="Percfect Princesses Generator"
-      allowfullscreen
-      loading="lazy"
-      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-    ></iframe>
-  {% elif is_adult %}
-    <iframe
-      src="https://perchance.org/9ujldjgr1f"
-      title="Percfect Princesses Generator"
-      allowfullscreen
-      loading="lazy"
-      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-    ></iframe>
-  {% else %}
-    <div class="pp-age-gate">
-      <h2>🔞 Age Verification Required</h2>
-      <p>This generator may contain mature content. You must be 18+ to access it. Please update your date of birth in your account settings.</p>
-      <a href="/dashboard" class="btn-accent">Go to Dashboard</a>
-    </div>
-  {% endif %}
+  <iframe
+    src="https://perchance.org/9ujldjgr1f"
+    title="Percfect Princesses Generator"
+    allowfullscreen
+    loading="lazy"
+    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+  ></iframe>
 </div>
 
 <div class="pp-ad-banner">
