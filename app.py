@@ -254,6 +254,20 @@ def percfectstudios():
     return render_template("percfectstudios.html", user=user_data)
 
 
+@app.route("/percfectstudios/recent")
+def recent_generations():
+    try:
+        res = supabase.table("generations")\
+            .select("output_url,prompt,type")\
+            .eq("type", "image")\
+            .order("created_at", desc=True)\
+            .limit(9)\
+            .execute()
+        return jsonify(res.data or [])
+    except Exception:
+        return jsonify([])
+
+
 @app.route("/percfectstudios/generate-image", methods=["POST"])
 @login_required
 def generate_image():
