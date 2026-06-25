@@ -64,6 +64,7 @@ def main():
     zip_dir(REPO_SRC, repo_zip_path)
 
     print(f"Built plugin zip: {plugin_zip_path}")
+    shutil.copy2(repo_zip_path, OUT_SITE / "repository.zip")
     print(f"Built repo zip:   {repo_zip_path}")
     print(f"addons.xml md5:   {md5}")
 
