@@ -49,6 +49,7 @@ class User(UserMixin):
         self.images_today = data.get("images_today", 0)
         self.videos_today = data.get("videos_today", 0)
         self.last_reset = data.get("last_reset")
+        self.is_admin = bool(data.get("is_admin", False))
 
     def get_id(self):
         return str(self.id)
@@ -103,14 +104,15 @@ def generate_video_xai(prompt: str, image_url: str = None) -> dict:
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "grok-2-aurora",
+        "model": "aurora",
         "prompt": prompt,
     }
     if image_url:
         payload["image_url"] = image_url
 
     resp = requests.post(f"{XAI_BASE_URL}/video/generations", json=payload, headers=headers, timeout=120)
-    resp.raise_for_status()
+    if not resp.ok:
+        raise Exception(f"xAI video error {resp.status_code}: {resp.text}")
     return resp.json()
 
 
@@ -255,7 +257,7 @@ def generate_image():
     res = supabase.table("users").select("picture_credits,images_today").eq("id", current_user.id).single().execute()
     user_data = res.data
 
-    if user_data["picture_credits"] <= 0:
+    if not current_user.is_admin and user_data["picture_credits"] <= 0:
         return jsonify({"error": "No image credits remaining."}), 402
 
     prompt = request.form.get("prompt", "").strip()
@@ -269,10 +271,11 @@ def generate_image():
         result = generate_image_xai(full_prompt)
         image_url = result["data"][0]["url"]
 
-        supabase.table("users").update({
-            "picture_credits": user_data["picture_credits"] - 1,
-            "images_today": user_data["images_today"] + 1
-        }).eq("id", current_user.id).execute()
+        if not current_user.is_admin:
+            supabase.table("users").update({
+                "picture_credits": user_data["picture_credits"] - 1,
+                "images_today": user_data["images_today"] + 1
+            }).eq("id", current_user.id).execute()
 
         supabase.table("generations").insert({
             "user_id": current_user.id,
@@ -295,7 +298,7 @@ def generate_video():
     res = supabase.table("users").select("video_credits,videos_today").eq("id", current_user.id).single().execute()
     user_data = res.data
 
-    if user_data["video_credits"] <= 0:
+    if not current_user.is_admin and user_data["video_credits"] <= 0:
         return jsonify({"error": "No video credits remaining."}), 402
 
     prompt = request.form.get("prompt", "").strip()
@@ -308,10 +311,11 @@ def generate_video():
         result = generate_video_xai(prompt, image_url)
         video_url = result.get("url") or result.get("data", [{}])[0].get("url")
 
-        supabase.table("users").update({
-            "video_credits": user_data["video_credits"] - 1,
-            "videos_today": user_data["videos_today"] + 1
-        }).eq("id", current_user.id).execute()
+        if not current_user.is_admin:
+            supabase.table("users").update({
+                "video_credits": user_data["video_credits"] - 1,
+                "videos_today": user_data["videos_today"] + 1
+            }).eq("id", current_user.id).execute()
 
         supabase.table("generations").insert({
             "user_id": current_user.id,
