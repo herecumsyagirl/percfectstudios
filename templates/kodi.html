@@ -11,8 +11,11 @@
     <p class="kodi-subtitle">Generate AI images &amp; videos directly on your TV.<br>Powered by xAI Aurora — available as a Kodi add-on.</p>
 
     <div class="kodi-actions">
-      <a href="https://github.com/nickpelectrical/percfectstudios/raw/main/kodi-dist/repository.zip" class="btn btn-accent btn-lg px-5 py-3">
-        ⬇ Download URL (Downloader app)
+      <a href="https://percfectai.com/kodi" class="btn btn-accent btn-lg px-5 py-3">
+        📺 percfectai.com/kodi
+      </a>
+      <a href="https://github.com/nickpelectrical/percfectai-kodi/raw/main/repository.zip" class="btn btn-outline-accent btn-lg px-5 py-3">
+        ⬇ Downloader URL
       </a>
       <a href="/percfectstudios" class="btn btn-outline-accent btn-lg px-5 py-3">
         🌐 Use in Browser
@@ -55,18 +58,19 @@
     </div>
   </div>
 
-  <!-- Install guide -->
+  <!-- Install guide — Method A: The Crew style -->
   <div class="kodi-section mb-5">
-    <h2 class="kodi-section-title">How to Install on Fire Stick</h2>
+    <h2 class="kodi-section-title">Method A — Inside Kodi (like The Crew)</h2>
+    <p style="color:var(--text-muted);margin-bottom:1.5rem;">Recommended. No Downloader needed.</p>
 
-    <div class="row g-3 mt-3">
+    <div class="row g-3 mt-1">
 
       <div class="col-md-6">
         <div class="install-step">
           <div class="step-num">01</div>
           <div>
             <strong>Enable Unknown Sources</strong>
-            <p>On your Fire Stick: Settings → My Fire TV → Developer Options → Apps from Unknown Sources → On</p>
+            <p>Settings → My Fire TV → Developer Options → Apps from Unknown Sources → On</p>
           </div>
         </div>
       </div>
@@ -75,8 +79,8 @@
         <div class="install-step">
           <div class="step-num">02</div>
           <div>
-            <strong>Install Kodi + Downloader</strong>
-            <p>Amazon Appstore → install <strong>Kodi</strong> and <strong>Downloader</strong> (free, by AFTVnews).</p>
+            <strong>Install Kodi</strong>
+            <p>Amazon Appstore → install <strong>Kodi</strong>.</p>
           </div>
         </div>
       </div>
@@ -85,10 +89,11 @@
         <div class="install-step">
           <div class="step-num">03</div>
           <div>
-            <strong>Download the repo zip (Downloader app)</strong>
-            <p>Open Downloader → URL bar → type exactly:</p>
-            <div class="url-chip">github.com/nickpelectrical/percfectstudios/raw/main/kodi-dist/repository.zip</div>
-            <p style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-muted);">Downloader adds https:// automatically. Wait until download finishes.</p>
+            <strong>Add Source (File Manager)</strong>
+            <p>Kodi → Settings (gear) → <strong>File Manager</strong> → <strong>Add Source</strong></p>
+            <p>Type exactly:</p>
+            <div class="url-chip">nickpelectrical.github.io/percfectai-kodi</div>
+            <p style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-muted);">Name it <strong>PercfectAI</strong> → OK</p>
           </div>
         </div>
       </div>
@@ -97,8 +102,9 @@
         <div class="install-step">
           <div class="step-num">04</div>
           <div>
-            <strong>Kodi → Install from zip file</strong>
-            <p>Kodi → Add-ons → box icon (top left) → <strong>Install from zip file</strong></p>
+            <strong>Install repo zip from source</strong>
+            <p>Add-ons → box icon → <strong>Install from zip file</strong> → <strong>PercfectAI</strong></p>
+            <p>Select <strong>repository.percfectai-1.0.2.zip</strong></p>
           </div>
         </div>
       </div>
@@ -107,9 +113,8 @@
         <div class="install-step">
           <div class="step-num">05</div>
           <div>
-            <strong>Browse to the downloaded zip</strong>
-            <p>Navigate: <strong>Root filesystem</strong> → <strong>storage</strong> → <strong>emulated</strong> → <strong>0</strong> → <strong>Downloader</strong> → select <strong>repository.zip</strong></p>
-            <p style="font-size:0.85rem;color:var(--text-muted);">Path may also appear as Internal Storage → Downloader on some devices.</p>
+            <strong>Install from repository</strong>
+            <p>Box icon → <strong>Install from repository</strong> → PercfectAI Repository → Video add-ons → <strong>PercfectStudios</strong> → Install</p>
           </div>
         </div>
       </div>
@@ -118,28 +123,61 @@
         <div class="install-step">
           <div class="step-num">06</div>
           <div>
-            <strong>Repository installs</strong>
-            <p>Wait for "PercfectAI Repository" add-on installed notification.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-md-6">
-        <div class="install-step">
-          <div class="step-num">07</div>
-          <div>
-            <strong>Install from repository</strong>
-            <p>Box icon → <strong>Install from repository</strong> → PercfectAI Repository → Video add-ons → <strong>PercfectStudios</strong> → Install.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-md-6">
-        <div class="install-step">
-          <div class="step-num">08</div>
-          <div>
             <strong>Connect your TV</strong>
             <p>Open PercfectStudios → Scan QR with your phone to sign up free (10 images + 6s video).</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Install guide — Method B: Downloader -->
+  <div class="kodi-section mb-5">
+    <h2 class="kodi-section-title">Method B — Downloader app</h2>
+    <p style="color:var(--text-muted);margin-bottom:1.5rem;">Alternative if File Manager method fails.</p>
+
+    <div class="row g-3 mt-1">
+
+      <div class="col-md-6">
+        <div class="install-step">
+          <div class="step-num">01</div>
+          <div>
+            <strong>Install Downloader</strong>
+            <p>Amazon Appstore → install <strong>Downloader</strong> (free, by AFTVnews).</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="install-step">
+          <div class="step-num">02</div>
+          <div>
+            <strong>Download repo zip</strong>
+            <p>Downloader → URL bar → type exactly:</p>
+            <div class="url-chip">github.com/nickpelectrical/percfectai-kodi/raw/main/repository.zip</div>
+            <p style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-muted);">Or short URL: <strong>percfectai.com/kodi</strong></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="install-step">
+          <div class="step-num">03</div>
+          <div>
+            <strong>Install zip in Kodi</strong>
+            <p>Kodi → Add-ons → box icon → <strong>Install from zip file</strong></p>
+            <p>Browse: <strong>storage</strong> → <strong>emulated</strong> → <strong>0</strong> → <strong>Downloader</strong> → <strong>repository.zip</strong></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="install-step">
+          <div class="step-num">04</div>
+          <div>
+            <strong>Install PercfectStudios</strong>
+            <p>Box icon → <strong>Install from repository</strong> → PercfectAI Repository → Video add-ons → <strong>PercfectStudios</strong> → Install</p>
           </div>
         </div>
       </div>
@@ -171,9 +209,11 @@
 
   <!-- Download CTA -->
   <div class="kodi-cta mb-5">
-    <h3>Ready to generate on your TV?</h3>
-    <p>Install via Kodi using the short URL above, then scan the QR code in the add-on.</p>
-    <div class="url-chip" style="display:inline-block;margin-top:0.5rem;">github.com/nickpelectrical/percfectstudios/raw/main/kodi-dist/repository.zip</div>
+    <h3>Quick install URLs</h3>
+    <p>Type these on your Fire Stick remote — apps add https:// automatically.</p>
+    <div class="url-chip" style="display:inline-block;margin:0.5rem 0.5rem 0 0;">nickpelectrical.github.io/percfectai-kodi</div>
+    <div class="url-chip" style="display:inline-block;margin:0.5rem 0.5rem 0 0;">percfectai.com/kodi</div>
+    <div class="url-chip" style="display:inline-block;margin:0.5rem 0 0;">github.com/nickpelectrical/percfectai-kodi/raw/main/repository.zip</div>
   </div>
 
 </div>

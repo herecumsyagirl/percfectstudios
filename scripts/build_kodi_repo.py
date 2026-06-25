@@ -71,7 +71,7 @@ def main():
         shutil.rmtree(OUT_SITE)
     shutil.copytree(OUT_GITHUB, OUT_SITE)
     print(f"Built repo zip:   {repo_zip_path}")
-    print("GitHub install:   https://github.com/nickpelectrical/percfectstudios/raw/main/kodi-dist/repository.zip")
+    print("GitHub install:   https://github.com/nickpelectrical/percfectai-kodi/raw/main/repository.zip")
     print(f"addons.xml md5:   {md5}")
 
 
