@@ -116,6 +116,8 @@ def generate_video_xai(prompt: str, image_url: str = None) -> dict:
 
 # ── Auth Routes ───────────────────────────────────────────
 def _do_register(username, password, birthday=""):
+    if not username or not password:
+        return None, "Username and password are required."
     exists = supabase.table("users").select("id").eq("username", username).execute()
     if exists.data:
         return None, "Username already taken."
@@ -124,7 +126,7 @@ def _do_register(username, password, birthday=""):
     result = supabase.table("users").insert({
         "username": username,
         "password": hashed,
-        "birthday": birthday,
+        "birthday": birthday or None,
         "picture_credits": 5,
         "video_credits": 2,
         "images_today": 0,
