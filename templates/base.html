@@ -256,6 +256,7 @@ textarea.form-control { resize: vertical; min-height: 96px; }
 /* ── Footer ─────────────────────────────────────────── */
 .footer { border-top: 1px solid var(--border); margin-top: auto; padding: 1.5rem 0; }
 .footer .text-muted { color: var(--text-muted) !important; font-size: 0.8rem; }
+.pw-rule{font-size:.7rem;padding:.2rem .6rem;border-radius:99px;border:1px solid var(--border-2);background:var(--bg-3);color:var(--text-muted);transition:all .2s;font-family:var(--font-mono)}
 
 /* ── Responsive ─────────────────────────────────────── */
 @media (max-width: 768px) {
@@ -386,11 +387,17 @@ textarea.form-control { resize: vertical; min-height: 96px; }
           </div>
           <div class="mb-3">
             <label class="form-label">Password</label>
-            <input class="form-control" type="password" id="su-password" placeholder="choose a password" autocomplete="new-password" />
+            <input class="form-control" type="password" id="su-password" placeholder="Min 8 chars, uppercase, number, symbol" autocomplete="new-password" />
+            <div id="pw-rules" style="margin-top:0.4rem;display:flex;flex-wrap:wrap;gap:0.3rem;">
+              <span class="pw-rule" id="pr-len">8+ chars</span>
+              <span class="pw-rule" id="pr-upper">A–Z</span>
+              <span class="pw-rule" id="pr-num">0–9</span>
+              <span class="pw-rule" id="pr-sym">!@#...</span>
+            </div>
           </div>
           <div class="mb-4">
-            <label class="form-label">Birthday <span style="color:var(--text-muted)">(optional)</span></label>
-            <input class="form-control" type="date" id="su-birthday" />
+            <label class="form-label">Date of Birth <span style="color:var(--danger);font-size:0.75rem;">required · must be 18+</span></label>
+            <input class="form-control" type="date" id="su-birthday" required />
           </div>
           <div id="su-error" class="alert alert-danger mb-3" style="display:none;font-size:0.85rem;"></div>
           <button onclick="submitSignup()" class="btn-accent w-100 py-2" style="border-radius:10px;border:none;cursor:pointer;font-size:0.95rem;" id="su-btn">
@@ -432,18 +439,50 @@ textarea.form-control { resize: vertical; min-height: 96px; }
     document.getElementById('tab-login').style.color       = isSignup ? 'var(--text-muted)' : '#fff';
   }
 
+  // Password rule chip highlighting
+  document.addEventListener('input', function(e) {
+    if (e.target.id !== 'su-password') return;
+    const v = e.target.value;
+    const mark = (id, ok) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.style.background = ok ? 'rgba(52,211,153,0.15)' : 'var(--bg-3)';
+      el.style.borderColor = ok ? 'rgba(52,211,153,0.4)' : 'var(--border-2)';
+      el.style.color = ok ? 'var(--success)' : 'var(--text-muted)';
+    };
+    mark('pr-len',   v.length >= 8);
+    mark('pr-upper', /[A-Z]/.test(v));
+    mark('pr-num',   /[0-9]/.test(v));
+    mark('pr-sym',   /[^A-Za-z0-9]/.test(v));
+  });
+
   async function submitSignup() {
     const btn = document.getElementById('su-btn');
     const err = document.getElementById('su-error');
-    btn.disabled = true; btn.textContent = 'Creating…'; err.style.display = 'none';
+    const pw  = document.getElementById('su-password').value;
+    const dob = document.getElementById('su-birthday').value;
+    err.style.display = 'none';
+
+    // Password validation
+    if (pw.length < 8 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw)) {
+      err.textContent = 'Password needs 8+ characters, an uppercase letter, a number, and a symbol.';
+      err.style.display = ''; return;
+    }
+
+    // Age validation (must be 18+)
+    if (!dob) { err.textContent = 'Date of birth is required.'; err.style.display = ''; return; }
+    const age = (Date.now() - new Date(dob)) / (365.25 * 24 * 3600 * 1000);
+    if (age < 18) { err.textContent = 'You must be 18 or older to sign up.'; err.style.display = ''; return; }
+
+    btn.disabled = true; btn.textContent = 'Creating…';
     try {
       const res = await fetch('/auth/register', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           username: document.getElementById('su-username').value.trim(),
-          password: document.getElementById('su-password').value,
-          birthday: document.getElementById('su-birthday').value,
+          password: pw,
+          birthday: dob,
         })
       });
       const data = await res.json();
