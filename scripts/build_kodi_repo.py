@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Kodi repository zips and copy to percfectai-site/kodi/ for Vercel deploy."""
+"""Build Kodi repository zips for GitHub (kodi-dist/) and Vercel mirror."""
 
 import hashlib
 import re
@@ -10,8 +10,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_SRC = ROOT / "static/kodi/plugin.video.percfectstudios"
 REPO_SRC = ROOT / "kodi/repository.percfectai"
+OUT_GITHUB = ROOT / "kodi-dist"
 OUT_SITE = ROOT.parent / "percfectai-site/kodi"
-ZIPS_DIR = OUT_SITE / "repo/zips"
+ZIPS_DIR = OUT_GITHUB / "repo/zips"
 PLUGIN_ID = "plugin.video.percfectstudios"
 REPO_ID = "repository.percfectai"
 
@@ -48,8 +49,8 @@ def main():
     plugin_zip_name = f"{PLUGIN_ID}-{plugin_ver}.zip"
     repo_zip_name = f"{REPO_ID}-{repo_ver}.zip"
 
-    if OUT_SITE.exists():
-        shutil.rmtree(OUT_SITE)
+    if OUT_GITHUB.exists():
+        shutil.rmtree(OUT_GITHUB)
     ZIPS_DIR.mkdir(parents=True)
 
     plugin_zip_path = ZIPS_DIR / PLUGIN_ID / plugin_zip_name
@@ -60,12 +61,17 @@ def main():
     md5 = hashlib.md5(addons_xml.encode()).hexdigest()
     (ZIPS_DIR / "addons.xml.md5").write_text(md5)
 
-    repo_zip_path = OUT_SITE / repo_zip_name
+    repo_zip_path = OUT_GITHUB / repo_zip_name
     zip_dir(REPO_SRC, repo_zip_path)
 
     print(f"Built plugin zip: {plugin_zip_path}")
-    shutil.copy2(repo_zip_path, OUT_SITE / "repository.zip")
+    shutil.copy2(repo_zip_path, OUT_GITHUB / "repository.zip")
+    # Mirror to Vercel static (optional fallback)
+    if OUT_SITE.exists():
+        shutil.rmtree(OUT_SITE)
+    shutil.copytree(OUT_GITHUB, OUT_SITE)
     print(f"Built repo zip:   {repo_zip_path}")
+    print("GitHub install:   https://github.com/nickpelectrical/percfectstudios/raw/main/kodi-dist/repository.zip")
     print(f"addons.xml md5:   {md5}")
 
 
