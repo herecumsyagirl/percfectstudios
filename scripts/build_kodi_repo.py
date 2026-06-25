@@ -70,7 +70,7 @@ def main():
         "<!DOCTYPE html>\n<html><head><meta charset=\"UTF-8\">"
         "<title>PercfectAI Kodi Repository</title></head><body>\n"
         "<h1>PercfectAI Kodi Repository</h1>\n"
-        "<p>Add Source in Kodi: <code>herecumsyagirl.github.io/percfectai-kodi</code></p>\n"
+        "<p>Add Source in Kodi: <code>percfectai.com/kodi</code></p>\n"
         f"<ul><li><a href=\"{repo_zip_name}\">{repo_zip_name}</a></li>"
         "<li><a href=\"repository.zip\">repository.zip</a></li></ul>\n"
         "</body></html>\n"
@@ -80,8 +80,8 @@ def main():
         shutil.rmtree(OUT_SITE)
     shutil.copytree(OUT_GITHUB, OUT_SITE)
     print(f"Built repo zip:   {repo_zip_path}")
-    print("Kodi Add Source:  https://herecumsyagirl.github.io/percfectai-kodi/")
-    print("Downloader URL:   https://github.com/herecumsyagirl/percfectai-kodi/raw/main/repository.zip")
+    print("Kodi URL:         https://percfectai.com/kodi")
+    print("Downloader URL:   https://percfectai.com/kodi/repository.zip")
     print(f"addons.xml md5:   {md5}")
 
 
