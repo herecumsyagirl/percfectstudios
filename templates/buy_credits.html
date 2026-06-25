@@ -31,23 +31,27 @@
         <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1.75rem;">one-time</div>
 
         <ul style="list-style:none;padding:0;margin:0 0 2rem;text-align:left;display:flex;flex-direction:column;gap:0.6rem;">
-          <li style="font-size:0.875rem;color:var(--text-muted);padding-left:1.25rem;position:relative;">
-            <span style="position:absolute;left:0;color:var(--accent);font-weight:700;">✓</span>
-            {{ pkg.image_credits }} image credits
-          </li>
           {% if pkg.video_credits %}
-          <li style="font-size:0.875rem;color:var(--text-muted);padding-left:1.25rem;position:relative;">
+          <li style="font-size:0.875rem;color:var(--text);padding-left:1.25rem;position:relative;font-weight:600;">
             <span style="position:absolute;left:0;color:var(--accent);font-weight:700;">✓</span>
-            {{ pkg.video_credits * 6 }} seconds of video
+            Up to {{ (pkg.video_credits // 6) }} AI videos
           </li>
           {% endif %}
+          <li style="font-size:0.875rem;color:var(--text);padding-left:1.25rem;position:relative;font-weight:600;">
+            <span style="position:absolute;left:0;color:var(--accent);font-weight:700;">✓</span>
+            {{ pkg.image_credits }} AI images
+          </li>
+          <li style="font-size:0.875rem;color:var(--text-muted);padding-left:1.25rem;position:relative;">
+            <span style="position:absolute;left:0;color:var(--accent);font-weight:700;">✓</span>
+            Mix & match any video length
+          </li>
           <li style="font-size:0.875rem;color:var(--text-muted);padding-left:1.25rem;position:relative;">
             <span style="position:absolute;left:0;color:var(--accent);font-weight:700;">✓</span>
             Credits never expire
           </li>
           <li style="font-size:0.875rem;color:var(--text-muted);padding-left:1.25rem;position:relative;">
             <span style="position:absolute;left:0;color:var(--accent);font-weight:700;">✓</span>
-            Download all outputs
+            Download everything in HD
           </li>
         </ul>
 

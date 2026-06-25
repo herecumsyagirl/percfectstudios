@@ -109,11 +109,24 @@
         </div>
 
         <div class="mb-3">
-          <label class="form-label" style="display:flex;align-items:center;gap:0.5rem;">
-            Animate an image
-            <span class="form-hint">optional — paste URL or use ▶ Animate from image panel</span>
-          </label>
-          <input class="form-control" id="vid-image-url" type="url" placeholder="https://… paste an image URL" />
+          <label class="form-label">Animate an image <span class="form-hint">optional</span></label>
+          <div id="drop-zone" onclick="document.getElementById('vid-file-input').click()">
+            <span id="drop-label">Drop image here or click to upload</span>
+            <img id="drop-preview" src="" alt="" style="display:none;max-height:80px;border-radius:8px;margin-top:0.5rem;" />
+          </div>
+          <input type="file" id="vid-file-input" accept="image/*" style="display:none" onchange="handleFileSelect(this)" />
+          <input class="form-control mt-2" id="vid-image-url" type="url" placeholder="…or paste an image URL" style="font-size:0.8rem;padding:0.45rem 0.75rem;" />
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Video length</label>
+          <div class="duration-chips">
+            <span class="style-chip active" onclick="setDuration(this,5)">5 sec</span>
+            <span class="style-chip" onclick="setDuration(this,6)">6 sec</span>
+            <span class="style-chip" onclick="setDuration(this,10)">10 sec</span>
+            <span class="style-chip" onclick="setDuration(this,15)">15 sec</span>
+          </div>
+          <p class="credit-note" id="duration-note" style="text-align:left;margin-top:0.4rem;">Uses 5 seconds of your video balance</p>
         </div>
 
         <button class="generate-btn generate-btn-video" id="vid-btn" onclick="generateVideo()">
@@ -199,6 +212,18 @@
   margin-bottom:.9rem;
 }
 
+/* Drop zone */
+#drop-zone {
+  border:2px dashed var(--border-2);border-radius:12px;
+  padding:1.25rem;text-align:center;cursor:pointer;
+  transition:all .2s;color:var(--text-muted);font-size:.85rem;
+  background:var(--bg-3);
+}
+#drop-zone:hover,#drop-zone.drag-over {
+  border-color:var(--accent);background:rgba(124,92,252,.06);color:var(--accent-2);
+}
+#drop-zone.has-image { border-style:solid;border-color:var(--accent); }
+
 /* Prompt pills */
 .prompt-pills { display:flex;flex-wrap:wrap;gap:.5rem; }
 .prompt-pill {
@@ -282,6 +307,7 @@
 }
 .gallery-item:hover .gallery-prompt { opacity:1; }
 .mb-6 { margin-bottom: 4rem; }
+.duration-chips { display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.5rem; }
 </style>
 
 <script>
@@ -366,8 +392,10 @@ async function _generateVideo() {
   setLoading('vid', true);
   const fd = new FormData();
   fd.append('prompt', prompt);
+  fd.append('duration', _duration || 5);
   const imgUrl = document.getElementById('vid-image-url').value.trim();
   if (imgUrl) fd.append('image_url', imgUrl);
+  if (window._droppedImageFile) fd.append('image_file', window._droppedImageFile);
   try {
     const res = await fetch('/percfectstudios/generate-video', {method:'POST', body:fd});
     const data = await res.json();
@@ -407,6 +435,46 @@ function showError(panel, msg) {
   el.textContent = msg; el.style.display = 'block';
   setLoading(panel, false);
 }
+
+/* ── Duration ──────────────────────────────────── */
+let _duration = 5;
+function setDuration(chip, secs) {
+  document.querySelectorAll('.duration-chips .style-chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  _duration = secs;
+  document.getElementById('duration-note').textContent = `Uses ${secs} seconds of your video balance`;
+}
+
+/* ── Drag & drop ───────────────────────────────── */
+function setupDropZone() {
+  const zone = document.getElementById('drop-zone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) loadDroppedFile(file);
+  });
+}
+function handleFileSelect(input) {
+  if (input.files[0]) loadDroppedFile(input.files[0]);
+}
+function loadDroppedFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const zone = document.getElementById('drop-zone');
+    const preview = document.getElementById('drop-preview');
+    const label = document.getElementById('drop-label');
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    label.textContent = file.name;
+    zone.classList.add('has-image');
+    window._droppedImageFile = file;
+    document.getElementById('vid-image-url').value = '';
+  };
+  reader.readAsDataURL(file);
+}
+setupDropZone();
 
 /* ── Gallery ───────────────────────────────────── */
 async function loadGallery() {

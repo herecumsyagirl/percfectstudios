@@ -34,9 +34,9 @@ STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 
 # Credit packages: price_id -> (image_credits, video_credits)
 CREDIT_PACKAGES = {
-    "starter":   {"name": "Starter",  "price": 500,  "image_credits": 50,  "video_credits": 5,  "price_id": os.getenv("STRIPE_PRICE_STARTER")},
-    "creator":   {"name": "Creator",  "price": 1500, "image_credits": 150, "video_credits": 15, "price_id": os.getenv("STRIPE_PRICE_CREATOR")},
-    "pro":       {"name": "Pro",      "price": 2500, "image_credits": 250, "video_credits": 25, "price_id": os.getenv("STRIPE_PRICE_PRO")},
+    "starter":   {"name": "Starter",  "price": 500,  "image_credits": 50,  "video_credits": 30,  "price_id": os.getenv("STRIPE_PRICE_STARTER")},
+    "creator":   {"name": "Creator",  "price": 1500, "image_credits": 150, "video_credits": 90,  "price_id": os.getenv("STRIPE_PRICE_CREATOR")},
+    "pro":       {"name": "Pro",      "price": 2500, "image_credits": 250, "video_credits": 150, "price_id": os.getenv("STRIPE_PRICE_PRO")},
 }
 
 # ── Flask-Login ───────────────────────────────────────────
@@ -102,13 +102,13 @@ def generate_image_xai(prompt: str) -> dict:
     return resp.json()
 
 
-def generate_video_xai(prompt: str, image_url: str = None) -> dict:
+def generate_video_xai(prompt: str, image_url: str = None, duration: int = 6) -> dict:
     import time
     headers = {
         "Authorization": f"Bearer {XAI_API_KEY}",
         "Content-Type": "application/json"
     }
-    payload = {"model": "aurora", "prompt": prompt}
+    payload = {"model": "aurora", "prompt": prompt, "duration": duration}
     if image_url:
         payload["image_url"] = image_url
 
@@ -153,7 +153,7 @@ def _do_register(username, password, birthday=""):
         "password": hashed,
         "birthday": birthday or None,
         "picture_credits": 5,
-        "video_credits": 2,
+        "video_credits": 12,
         "images_today": 0,
         "videos_today": 0,
         "last_reset": now,
@@ -335,24 +335,26 @@ def generate_video():
     res = supabase.table("users").select("video_credits,videos_today").eq("id", current_user.id).single().execute()
     user_data = res.data
 
-    if not current_user.is_admin and user_data["video_credits"] <= 0:
-        return jsonify({"error": "No video credits remaining."}), 402
-
     prompt = request.form.get("prompt", "").strip()
     image_url = request.form.get("image_url", "").strip() or None
+    duration = int(request.form.get("duration", 6))
+    duration = max(5, min(15, duration))  # clamp 5-15 seconds
+
+    if not current_user.is_admin and user_data["video_credits"] < duration:
+        return jsonify({"error": f"Not enough video seconds. You have {user_data['video_credits']}s remaining."}), 402
 
     if not prompt:
         return jsonify({"error": "Prompt is required."}), 400
 
     try:
-        result = generate_video_xai(prompt, image_url)
+        result = generate_video_xai(prompt, image_url, duration)
         video_url = (result.get("video") or {}).get("url") \
             or result.get("url") \
             or (result.get("data") or [{}])[0].get("url")
 
         if not current_user.is_admin:
             supabase.table("users").update({
-                "video_credits": user_data["video_credits"] - 1,
+                "video_credits": user_data["video_credits"] - duration,
                 "videos_today": user_data["videos_today"] + 1
             }).eq("id", current_user.id).execute()
 
