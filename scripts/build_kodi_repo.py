@@ -66,12 +66,22 @@ def main():
 
     print(f"Built plugin zip: {plugin_zip_path}")
     shutil.copy2(repo_zip_path, OUT_GITHUB / "repository.zip")
-    # Mirror to Vercel static (optional fallback)
+    index_html = (
+        "<!DOCTYPE html>\n<html><head><meta charset=\"UTF-8\">"
+        "<title>PercfectAI Kodi Repository</title></head><body>\n"
+        "<h1>PercfectAI Kodi Repository</h1>\n"
+        "<p>Add Source in Kodi: <code>herecumsyagirl.github.io/percfectai-kodi</code></p>\n"
+        f"<ul><li><a href=\"{repo_zip_name}\">{repo_zip_name}</a></li>"
+        "<li><a href=\"repository.zip\">repository.zip</a></li></ul>\n"
+        "</body></html>\n"
+    )
+    (OUT_GITHUB / "index.html").write_text(index_html)
     if OUT_SITE.exists():
         shutil.rmtree(OUT_SITE)
     shutil.copytree(OUT_GITHUB, OUT_SITE)
     print(f"Built repo zip:   {repo_zip_path}")
-    print("GitHub install:   https://github.com/nickpelectrical/percfectai-kodi/raw/main/repository.zip")
+    print("Kodi Add Source:  https://herecumsyagirl.github.io/percfectai-kodi/")
+    print("Downloader URL:   https://github.com/herecumsyagirl/percfectai-kodi/raw/main/repository.zip")
     print(f"addons.xml md5:   {md5}")
 
 
