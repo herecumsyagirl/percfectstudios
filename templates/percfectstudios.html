@@ -550,14 +550,20 @@ async function loadGallery() {
 }
 loadGallery();
 
-/* Princess → Studio handoff */
+/* Princess → Studio handoff (URL param or sessionStorage) */
 (function() {
-  const ref = sessionStorage.getItem('studio_ref_image');
+  const params = new URLSearchParams(window.location.search);
+  const ref = params.get('image_url') || sessionStorage.getItem('studio_ref_image');
   if (!ref) return;
   sessionStorage.removeItem('studio_ref_image');
   document.getElementById('vid-image-url').value = ref;
-  document.getElementById('vid-prompt').value = 'The princess comes to life, gentle magical movement, cinematic';
-  document.getElementById('vid-panel').scrollIntoView({ behavior: 'smooth' });
+  const prev = document.getElementById('drop-preview');
+  if (prev) { prev.src = ref; prev.style.display = 'block'; }
+  document.getElementById('drop-zone').classList.add('has-image');
+  document.getElementById('drop-label').style.display = 'none';
+  if (!document.getElementById('vid-prompt').value)
+    document.getElementById('vid-prompt').value = 'The princess comes to life, gentle magical movement, cinematic';
+  setTimeout(() => document.getElementById('vid-panel').scrollIntoView({ behavior: 'smooth' }), 300);
 })();
 </script>
 {% endblock %}
