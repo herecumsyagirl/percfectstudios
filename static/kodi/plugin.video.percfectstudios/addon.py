@@ -129,12 +129,15 @@ def verify_pin():
 
 
 def get_save_folder():
-    folder = 'special://profile/addon_data/plugin.video.percfectstudios/generations/'
-    return xbmc.translatePath(folder)
+    folder = ADDON.getSetting('save_folder') or 'special://profile/addon_data/plugin.video.percfectstudios/generations/'
+    path = xbmc.translatePath(folder)
+    if not path.endswith(os.sep):
+        path += os.sep
+    return path
 
 
 def should_auto_save():
-    return True
+    return ADDON.getSettingBool('auto_save')
 
 
 def pick_image_file():
@@ -301,6 +304,39 @@ def show_buy_credits(message=''):
         dialog.ok('Buy Credits', f'{message}\n\nGo to:\n\n[B]percfectai.com/buy-credits[/B]')
 
 
+def show_local_saves():
+    folder = get_save_folder()
+    xbmcplugin.setPluginCategory(HANDLE, 'Saved on this device')
+    xbmcplugin.setContent(HANDLE, 'videos')
+    try:
+        names = sorted(os.listdir(folder), reverse=True)
+    except Exception:
+        xbmcgui.Dialog().ok('Saved Files', f'No saves yet.\n\nFolder:\n{folder}')
+        return
+    found = False
+    for name in names:
+        path = os.path.join(folder, name)
+        if not os.path.isfile(path):
+            continue
+        ext = name.rsplit('.', 1)[-1].lower()
+        if ext not in ('jpg', 'jpeg', 'png', 'webp', 'mp4'):
+            continue
+        found = True
+        li = xbmcgui.ListItem(label=name)
+        li.setPath(path)
+        li.setProperty('IsPlayable', 'true')
+        if ext in ('jpg', 'jpeg', 'png', 'webp'):
+            li.setArt({'thumb': path})
+            li.setInfo('image', {'title': name})
+        else:
+            li.setInfo('video', {'title': name, 'mediatype': 'video'})
+        xbmcplugin.addDirectoryItem(HANDLE, path, li, False)
+    if not found:
+        xbmcgui.Dialog().ok('Saved Files', f'Nothing saved yet.\n\nFolder:\n{folder}')
+        return
+    xbmcplugin.endOfDirectory(HANDLE)
+
+
 def show_gallery():
     try:
         items = api_request('GET', '/api/gallery', timeout=15)
@@ -341,7 +377,8 @@ def main_menu():
     for label, action in [
         ('Generate Image', 'generate_image'),
         ('Generate Video', 'generate_video'),
-        ('My Gallery', 'gallery'),
+        ('My Gallery (cloud)', 'gallery'),
+        ('Saved on Device', 'local_saves'),
         ('Buy Credits', 'buy_credits'),
         ('Refresh Credits', 'refresh'),
         ('Settings', 'settings'),
@@ -364,6 +401,8 @@ elif action == 'generate_video':
     generate_video()
 elif action == 'gallery':
     show_gallery()
+elif action == 'local_saves':
+    show_local_saves()
 elif action == 'buy_credits':
     show_buy_credits()
 elif action == 'refresh':

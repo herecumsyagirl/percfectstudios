@@ -2,5 +2,10 @@
 <settings>
   <category label="Account">
     <setting id="api_key" type="text" label="API Key" default=""/>
+    <setting id="username" type="text" label="Username" enable="false" default=""/>
+  </category>
+  <category label="Storage">
+    <setting id="auto_save" type="bool" label="Auto-save generations" default="true"/>
+    <setting id="save_folder" type="folder" label="Save folder" default="special://profile/addon_data/plugin.video.percfectstudios/generations/"/>
   </category>
 </settings>
