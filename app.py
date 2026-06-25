@@ -103,21 +103,40 @@ def generate_image_xai(prompt: str) -> dict:
 
 
 def generate_video_xai(prompt: str, image_url: str = None) -> dict:
+    import time
     headers = {
         "Authorization": f"Bearer {XAI_API_KEY}",
         "Content-Type": "application/json"
     }
-    payload = {
-        "model": "aurora",
-        "prompt": prompt,
-    }
+    payload = {"model": "aurora", "prompt": prompt}
     if image_url:
         payload["image_url"] = image_url
 
-    resp = requests.post(f"{XAI_BASE_URL}/video/generations", json=payload, headers=headers, timeout=120)
+    # Submit job
+    resp = requests.post(f"{XAI_BASE_URL}/video/generations", json=payload, headers=headers, timeout=30)
     if not resp.ok:
         raise Exception(f"xAI video error {resp.status_code}: {resp.text}")
-    return resp.json()
+
+    job = resp.json()
+    job_id = job.get("id")
+    if not job_id:
+        # Synchronous response with URL already
+        return job
+
+    # Poll until complete (max 3 min)
+    for _ in range(36):
+        time.sleep(5)
+        poll = requests.get(f"{XAI_BASE_URL}/video/generations/{job_id}", headers=headers, timeout=15)
+        if not poll.ok:
+            continue
+        result = poll.json()
+        status = result.get("status", "")
+        if status == "succeeded":
+            return result
+        if status in ("failed", "cancelled"):
+            raise Exception(f"Video generation {status}: {result.get('error', '')}")
+
+    raise Exception("Video generation timed out after 3 minutes.")
 
 
 # ── Auth Routes ───────────────────────────────────────────
@@ -327,7 +346,9 @@ def generate_video():
 
     try:
         result = generate_video_xai(prompt, image_url)
-        video_url = result.get("url") or result.get("data", [{}])[0].get("url")
+        video_url = (result.get("video") or {}).get("url") \
+            or result.get("url") \
+            or (result.get("data") or [{}])[0].get("url")
 
         if not current_user.is_admin:
             supabase.table("users").update({

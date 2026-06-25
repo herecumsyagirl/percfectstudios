@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}PercfectStudios for Kodi & Fire Stick{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <!-- Hero -->
+  <div class="kodi-hero">
+    <div class="kodi-badge">🔥 Fire Stick Ready</div>
+    <h1>Percfect<span style="color:var(--accent)">Studios</span><br>for Kodi</h1>
+    <p class="kodi-subtitle">Generate AI images &amp; videos directly on your TV.<br>Powered by xAI Aurora — available as a Kodi add-on.</p>
+
+    <div class="kodi-actions">
+      <a href="/static/kodi/plugin.video.percfectstudios-1.0.0.zip"
+         download class="btn btn-accent btn-lg px-5 py-3">
+        ⬇ Download Add-on v1.0.0
+      </a>
+      <a href="/percfectstudios" class="btn btn-outline-accent btn-lg px-5 py-3">
+        🌐 Use in Browser
+      </a>
+    </div>
+
+    <div class="kodi-stats">
+      <span>Kodi 19+ (Matrix)</span>
+      <span class="sep">·</span>
+      <span>Fire Stick / Android TV</span>
+      <span class="sep">·</span>
+      <span>Python 3</span>
+      <span class="sep">·</span>
+      <span>Free to install</span>
+    </div>
+  </div>
+
+  <!-- Feature cards -->
+  <div class="row g-4 mb-5">
+    <div class="col-md-4">
+      <div class="kodi-feature-card">
+        <div class="kodi-icon">🖼</div>
+        <h5>Image Generation</h5>
+        <p>Type a prompt with your remote or keyboard, get stunning AI art on your TV in seconds.</p>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="kodi-feature-card featured">
+        <div class="kodi-icon">🎬</div>
+        <h5>Video Generation</h5>
+        <p>Generate cinematic AI videos and play them instantly on your big screen.</p>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="kodi-feature-card">
+        <div class="kodi-icon">📁</div>
+        <h5>Your Gallery</h5>
+        <p>Browse everything you've ever created — all your generations, right in Kodi.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Install guide -->
+  <div class="kodi-section mb-5">
+    <h2 class="kodi-section-title">How to Install on Fire Stick</h2>
+
+    <div class="row g-3 mt-3">
+
+      <div class="col-md-6">
+        <div class="install-step">
+          <div class="step-num">01</div>
+          <div>
+            <strong>Enable Unknown Sources</strong>
+            <p>On your Fire Stick: Settings → My Fire TV → Developer Options → Apps from Unknown Sources → On</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="install-step">
+          <div class="step-num">02</div>
+          <div>
+            <strong>Install Kodi</strong>
+            <p>Search for "Kodi" in the Amazon Appstore and install it, or sideload via Downloader app.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="install-step">
+          <div class="step-num">03</div>
+          <div>
+            <strong>Open Kodi → Add-ons</strong>
+            <p>Launch Kodi, go to Add-ons → click the box icon (top left) → Install from zip file.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="install-step">
+          <div class="step-num">04</div>
+          <div>
+            <strong>Enter the download URL</strong>
+            <p>When prompted for a source, type in:</p>
+            <div class="url-chip">percfectai.com/static/kodi/plugin.video.percfectstudios-1.0.0.zip</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="install-step">
+          <div class="step-num">05</div>
+          <div>
+            <strong>Enter your API Key</strong>
+            <p>After installing, open the add-on settings and paste your API key below.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="install-step">
+          <div class="step-num">06</div>
+          <div>
+            <strong>Start Generating</strong>
+            <p>Open PercfectStudios from your Kodi Add-ons menu and start creating on your TV.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- API Key section -->
+  <div class="kodi-section mb-5">
+    <h2 class="kodi-section-title">Your API Key</h2>
+    <p style="color:var(--text-muted);margin-top:0.5rem 0 1.5rem;">Paste this into the add-on settings (Add-ons → PercfectStudios → Configure)</p>
+
+    {% if api_key %}
+    <div class="api-key-display mt-3">
+      <div class="api-key-label">API Key</div>
+      <div class="api-key-value" id="api-key-val">{{ api_key }}</div>
+      <button class="btn btn-outline-accent btn-sm mt-3" onclick="copyKey()">Copy Key</button>
+      <span id="copy-confirm" style="display:none;margin-left:0.75rem;color:var(--success);font-size:0.85rem;">Copied!</span>
+    </div>
+    {% else %}
+    <div class="api-key-display mt-3" style="text-align:center;padding:2.5rem;">
+      <p style="color:var(--text-muted);margin-bottom:1rem;">Log in to see your API key</p>
+      <a href="/login" class="btn btn-accent">Log in</a>
+      <span style="margin:0 0.75rem;color:var(--text-muted)">or</span>
+      <a href="/register" class="btn btn-outline-accent">Create account</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Download CTA -->
+  <div class="kodi-cta mb-5">
+    <h3>Ready to generate on your TV?</h3>
+    <p>Download the add-on, install it in Kodi, paste your key — you're live.</p>
+    <a href="/static/kodi/plugin.video.percfectstudios-1.0.0.zip"
+       download class="btn btn-accent btn-lg px-5 py-3 mt-2">
+      ⬇ Download PercfectStudios for Kodi
+    </a>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function copyKey() {
+    const key = document.getElementById('api-key-val').textContent.trim();
+    navigator.clipboard.writeText(key).then(() => {
+      const c = document.getElementById('copy-confirm');
+      c.style.display = 'inline';
+      setTimeout(() => c.style.display = 'none', 2000);
+    });
+  }
+</script>
+{% endblock %}
