@@ -1203,13 +1203,13 @@ def kodi_activate_api():
         existing = supabase.table("kodi_sessions").select("id").eq("device_code", dc).execute()
         if existing.data:
             supabase.table("kodi_sessions").update({
-                "user_id": user.id, "pin": pin, "activated": False,
+                "user_id": user.id, "pin": pin, "activated": True,
                 "expires_at": expires,
             }).eq("device_code", dc).execute()
         else:
             supabase.table("kodi_sessions").insert({
                 "device_code": dc,
-                "user_id": user.id, "pin": pin, "activated": False,
+                "user_id": user.id, "pin": pin, "activated": True,
                 "expires_at": expires,
             }).execute()
 

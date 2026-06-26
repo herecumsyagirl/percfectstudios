@@ -92,11 +92,15 @@ def activate():
                 progress.close()
                 dialog.ok('Code Expired', 'Your QR code expired. Please try again.')
                 return False
-        except Exception:
-            pass
+        except Exception as e:
+            xbmc.log(f'PercfectStudios poll error: {e}', xbmc.LOGERROR)
 
     progress.close()
-    dialog.ok('Timed Out', 'Connection timed out. Please try again.')
+    dialog.ok(
+        'Connection timed out',
+        'Phone signup may have worked but TV did not connect.\n\n'
+        'Try: Settings → API Key, or Enter PIN manually.'
+    )
     return False
 
 
