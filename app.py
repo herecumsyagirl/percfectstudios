@@ -176,7 +176,12 @@ def generate_video_xai(prompt: str, image_url: str = None, duration: int = 6) ->
         "Authorization": f"Bearer {XAI_API_KEY}",
         "Content-Type": "application/json"
     }
-    payload = {"model": "grok-imagine-video", "prompt": prompt, "duration": duration}
+    payload = {
+        "model": "grok-imagine-video",
+        "prompt": prompt,
+        "duration": duration,
+        "resolution": "480p",
+    }
     if image_url:
         payload["image"] = {"url": image_url}
 
@@ -1298,6 +1303,29 @@ def kodi_poll(device_code):
         "image_credits": u.get("picture_credits", 0),
         "video_credits": u.get("video_credits", 0),
     })
+
+
+# In-memory TV prompt relay (device_code -> prompt text)
+_tv_prompts = {}
+
+
+@app.route("/api/tv/prompt", methods=["POST"])
+def tv_send_prompt():
+    data = request.get_json(silent=True) or {}
+    device_code = (data.get("device_code") or "").strip()
+    prompt = (data.get("prompt") or "").strip()
+    if not device_code or not prompt:
+        return jsonify({"error": "device_code and prompt required"}), 400
+    _tv_prompts[device_code] = prompt
+    return jsonify({"ok": True})
+
+
+@app.route("/api/tv/prompt/<device_code>")
+def tv_get_prompt(device_code):
+    prompt = _tv_prompts.pop(device_code, None)
+    if prompt:
+        return jsonify({"prompt": prompt})
+    return jsonify({"prompt": None})
 
 
 @app.route("/api/kodi/credits")
