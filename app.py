@@ -1316,6 +1316,11 @@ def _increment_princess_guest_usage():
     session.modified = True
 
 
+@app.route("/percfectpictures")
+def percfect_pictures():
+    return render_template("percfect_pictures.html")
+
+
 @app.route("/percfectprincesses")
 def percfect_princesses():
     guest_remaining = None

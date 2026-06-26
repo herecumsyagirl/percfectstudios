@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}Percfect Pictures — Free AI Image Generator{% endblock %}
+
+{% block content %}
+<style>
+  .pp-wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1.5rem 1rem 4rem;
+  }
+  .pp-hero {
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+  .pp-hero h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0.25rem;
+  }
+  .pp-hero p { color: var(--text-muted); font-size: 0.9rem; margin: 0; }
+
+  .pp-form {
+    background: var(--bg-2);
+    border: 1px solid var(--border-2);
+    border-radius: 18px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .pp-prompt {
+    width: 100%;
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    font-size: 0.95rem;
+    resize: vertical;
+    min-height: 80px;
+    margin-bottom: 1rem;
+    font-family: inherit;
+  }
+  .pp-prompt:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,92,252,0.15);
+  }
+  .pp-prompt::placeholder { color: var(--text-muted); }
+  .pp-controls {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .pp-count {
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.875rem;
+  }
+  .pp-count:focus { outline: none; border-color: var(--accent); }
+  .pp-ratio {
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.875rem;
+  }
+  .pp-ratio:focus { outline: none; border-color: var(--accent); }
+
+  .pp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+  }
+  .pp-card {
+    background: var(--bg-2);
+    border: 1px solid var(--border-2);
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+  }
+  .pp-card img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    display: block;
+    background: var(--bg-3);
+  }
+  .pp-card-loading {
+    width: 100%;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-3);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+  .pp-card-loading .spin {
+    display: inline-block;
+    animation: spin 1s linear infinite;
+    margin-right: 0.5rem;
+    font-size: 1.1rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .pp-card-actions {
+    padding: 0.6rem 0.75rem;
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+  .pp-card-actions .btn-sm {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    transition: opacity 0.15s;
+  }
+  .btn-animate { background: var(--accent); color: #fff; }
+  .btn-character { background: var(--bg-3); color: var(--text); border: 1px solid var(--border-2) !important; }
+  .btn-save { background: var(--accent-2); color: #fff; }
+  .pp-card-actions .btn-sm:hover { opacity: 0.85; }
+
+  .pp-empty {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 3rem 1rem;
+    grid-column: 1 / -1;
+  }
+  .pp-empty .pp-empty-icon { font-size: 3rem; margin-bottom: 0.5rem; }
+</style>
+
+<div class="pp-wrap">
+  <div class="pp-hero">
+    <h1>✦ Percfect Pictures</h1>
+    <p>Free AI image generator — type anything, get 10 images instantly</p>
+  </div>
+
+  <div class="pp-form">
+    <textarea
+      id="pp-prompt"
+      class="pp-prompt"
+      placeholder="Describe what you want to create… be specific for better results"
+      rows="3"
+    ></textarea>
+    <div class="pp-controls">
+      <button class="btn btn-accent" id="pp-generate" onclick="generatePictures()">✦ Generate</button>
+      <select class="pp-count" id="pp-count">
+        <option value="5">5 images</option>
+        <option value="10" selected>10 images</option>
+      </select>
+      <select class="pp-ratio" id="pp-ratio">
+        <option value="768x768" selected>Square (768×768)</option>
+        <option value="768x1024">Portrait (768×1024)</option>
+        <option value="1024x768">Landscape (1024×768)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="pp-grid" id="pp-grid">
+    <div class="pp-empty">
+      <div class="pp-empty-icon">🖼</div>
+      <div>Your images will appear here</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  async function generatePictures() {
+    const prompt = document.getElementById('pp-prompt').value.trim();
+    if (!prompt) {
+      document.getElementById('pp-prompt').focus();
+      return;
+    }
+    const count = parseInt(document.getElementById('pp-count').value);
+    const ratio = document.getElementById('pp-ratio').value;
+    const [w, h] = ratio.split('x');
+
+    const btn = document.getElementById('pp-generate');
+    btn.disabled = true;
+    btn.textContent = '⏳ Generating…';
+
+    const grid = document.getElementById('pp-grid');
+    grid.innerHTML = '';
+
+    const baseSeed = Math.floor(Math.random() * 1000000);
+
+    for (let i = 0; i < count; i++) {
+      const card = document.createElement('div');
+      card.className = 'pp-card';
+      card.innerHTML = `
+        <div class="pp-card-loading">
+          <span class="spin">⟳</span> Generating…
+        </div>
+      `;
+      grid.appendChild(card);
+
+      const seed = baseSeed + i;
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux`;
+
+      (function(cardEl, imgUrl) {
+        const img = new Image();
+        img.onload = function() {
+          cardEl.innerHTML = `
+            <img src="${imgUrl}" alt="Generated image" loading="lazy">
+            <div class="pp-card-actions">
+              <button class="btn-sm btn-animate" onclick="animateImage('${encodeURIComponent(imgUrl)}')">🎬 Animate</button>
+              <button class="btn-sm btn-character" onclick="useAsCharacter('${encodeURIComponent(imgUrl)}')">👤 Character</button>
+              <a class="btn-sm btn-save" href="${imgUrl}" download="percfect-picture.jpg" target="_blank">⬇ Save</a>
+            </div>
+          `;
+        };
+        img.onerror = function() {
+          cardEl.innerHTML = `<div class="pp-card-loading" style="color:var(--accent-2)">Failed — try again</div>`;
+        };
+        img.src = imgUrl;
+      })(card, url);
+    }
+
+    btn.disabled = false;
+    btn.textContent = '✦ Generate';
+  }
+
+  function animateImage(encodedUrl) {
+    window.location.href = '/percfectstudios?image_url=' + encodedUrl;
+  }
+
+  function useAsCharacter(encodedUrl) {
+    window.location.href = '/character?image_url=' + encodedUrl;
+  }
+
+  document.getElementById('pp-prompt').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) generatePictures();
+  });
+</script>
+{% endblock %}
