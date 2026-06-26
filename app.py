@@ -405,6 +405,27 @@ def ping():
     return "ok", 200
 
 
+# ── Self keep-alive ───────────────────────────────────────
+# Render's free tier sleeps after ~15 min with no inbound traffic, which
+# gives the next visitor a 30–50s cold start. A background thread pings our
+# own public URL every 10 min so inbound traffic never stops and it stays warm.
+def _self_keepalive():
+    import time
+    base = os.environ.get("RENDER_EXTERNAL_URL", "https://percfectstudios.onrender.com").rstrip("/")
+    url = f"{base}/ping"
+    while True:
+        time.sleep(600)  # 10 min — comfortably beats the ~15 min idle window
+        try:
+            requests.get(url, timeout=30)
+        except Exception:
+            pass
+
+
+if os.environ.get("ENABLE_KEEPALIVE", "1") == "1":
+    import threading
+    threading.Thread(target=_self_keepalive, daemon=True).start()
+
+
 # ── Main Pages ────────────────────────────────────────────
 @app.route("/")
 def index():
