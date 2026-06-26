@@ -6,51 +6,44 @@
 
   <div class="kodi-hero">
     <h1>Install on Fire Stick</h1>
-    <p class="kodi-subtitle">Crew-style. Type the <strong>full</strong> URL including <strong>https://</strong></p>
+    <p class="kodi-subtitle"><strong>1 URL to type.</strong> No File Manager. No API key.</p>
+    <div class="url-chip" style="font-size:2rem;padding:1.5rem;margin:1.5rem 0;">percfectai.com/k</div>
+    <p class="text-muted">Phone install page: <a href="https://percfectai.com/tv">percfectai.com/tv</a> (QR code)</p>
   </div>
 
   <div class="kodi-section mb-5">
-    <h2 class="kodi-section-title">4 steps</h2>
+    <h2 class="kodi-section-title">3 steps — minimal typing</h2>
 
     <div class="install-step mb-3">
       <div class="step-num">1</div>
       <div>
-        <strong>File manager → Add source</strong><br>
-        Click <code>&lt;None&gt;</code> and type this <em>entire</em> line:<br>
-        <div class="url-chip" style="font-size:1.15rem;">https://herecumsyagirl.github.io/percfectai-kodi/</div>
-        <small class="text-muted">Must start with https:// — Kodi will say "no directory" without it</small><br>
-        Name: <strong>Percfect</strong>
+        <strong>Downloader app</strong> — type only:<br>
+        <div class="url-chip">percfectai.com/k</div>
+        <small class="text-muted">Tip: use <strong>Amazon Fire TV app</strong> on your phone as the keyboard</small>
       </div>
     </div>
 
     <div class="install-step mb-3">
       <div class="step-num">2</div>
       <div>
-        <strong>Install repo zip</strong><br>
-        Add-ons → Install from zip → Percfect → <strong>repository.percfectai-1.0.9.zip</strong>
+        <strong>Kodi → Install from zip</strong><br>
+        Browse <strong>Downloads</strong> → pick the zip →<br>
+        <strong>Install from repository</strong> → PercfectStudios
       </div>
     </div>
 
     <div class="install-step mb-3">
       <div class="step-num">3</div>
       <div>
-        <strong>Install add-on</strong><br>
-        Install from repository → PercfectAI Repository → PercfectStudios
-      </div>
-    </div>
-
-    <div class="install-step mb-3">
-      <div class="step-num">4</div>
-      <div>
-        <strong>API key</strong> in Settings<br>
-        <code>e0b61d4a-ead2-4a43-b439-b79db701b6c2</code>
+        <strong>Open add-on → Scan QR</strong><br>
+        Sign up on your phone. TV connects automatically. <em>No API key typing.</em>
       </div>
     </div>
   </div>
 
   {% if api_key %}
   <div class="api-key-display mt-3 mb-5">
-    <div class="api-key-label">Your API Key</div>
+    <div class="api-key-label">Your API Key (optional — QR is easier)</div>
     <div class="api-key-value" id="api-key-val">{{ api_key }}</div>
     <button class="btn btn-outline-accent btn-sm mt-3" onclick="copyKey()">Copy</button>
   </div>
