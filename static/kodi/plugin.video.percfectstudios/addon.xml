@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addon id="plugin.video.percfectstudios"
        name="PercfectStudios"
-       version="1.1.4"
+       version="1.2.0"
        provider-name="PercfectAI">
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>
@@ -10,8 +10,8 @@
     <provides>video</provides>
   </extension>
   <extension point="xbmc.addon.metadata">
-    <summary lang="en_GB">Generate AI images and videos on your TV</summary>
-    <description lang="en_GB">PercfectStudios brings AI image and video generation powered by xAI Aurora to your Fire Stick and Kodi. Sign up free — 10 images + 1 video included.</description>
+    <summary lang="en_GB">Percfect App — free images + 480p video on TV</summary>
+    <description lang="en_GB">Opens percfectai.com/app on your Fire Stick. Free Perchance image batches + 480p xAI video animation. No folder menus — app-style grid UI.</description>
     <platform>all</platform>
     <language>en</language>
   </extension>

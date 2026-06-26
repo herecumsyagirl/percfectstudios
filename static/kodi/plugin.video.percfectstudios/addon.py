@@ -1,5 +1,6 @@
 import sys
 import xbmc
+import xbmcvfs
 import xbmcgui
 import xbmcplugin
 import xbmcaddon
@@ -134,7 +135,7 @@ def verify_pin():
 
 def get_save_folder():
     folder = ADDON.getSetting('save_folder') or 'special://profile/addon_data/plugin.video.percfectstudios/generations/'
-    path = xbmc.translatePath(folder)
+    path = xbmcvfs.translatePath(folder)
     if not path.endswith(os.sep):
         path += os.sep
     return path
@@ -175,56 +176,36 @@ def save_generation(url, kind, prompt):
 
 
 def credits_header(credits):
-    return f'[B]{credits.get("image_credits", 0)}[/B] images · [B]{credits.get("video_credits", 0)}s[/B] video'
+    return f'[B]{credits.get("video_credits", 0)}s[/B] video · images free in app'
 
 
-def generate_image():
-    credits = get_credits()
-    if credits.get('image_credits', 0) <= 0:
-        show_buy_credits('You have no image credits left.')
-        return
+def open_percfect_app():
+    """Images are free via Perchance in the web app — not xAI."""
+    url = f'{BASE_URL}/app'
     dialog = xbmcgui.Dialog()
-    mode = dialog.select('Generate Image', ['Text prompt only', 'Use my photo (image-to-image)'])
-    if mode < 0:
-        return
-    source_image = None
-    if mode == 1:
-        path = pick_image_file()
-        if not path:
-            return
-        source_image = file_to_data_uri(path)
-    prompt = dialog.input('Describe your image', type=xbmcgui.INPUT_ALPHANUM)
-    if not prompt:
-        return
-    progress = xbmcgui.DialogProgress()
-    progress.create('PercfectStudios', 'Generating your image...')
-    progress.update(20)
-    try:
-        payload = {'prompt': prompt}
-        if source_image:
-            payload['image_url'] = source_image
-        data = api_request('POST', '/api/generate/image', payload, timeout=90)
-        progress.update(90)
-        progress.close()
-        url = data.get('url')
-        if url:
-            saved = save_generation(url, 'image', prompt)
-            xbmc.executebuiltin(f'ShowPicture({url})')
-            if saved:
-                xbmcgui.Dialog().notification('PercfectStudios', f'Saved to {saved}', xbmcgui.NOTIFICATION_INFO, 4000)
-    except urllib.error.HTTPError as e:
-        progress.close()
-        try:
-            err = json.loads(e.read().decode()).get('error', 'Generation failed.')
-        except Exception:
-            err = 'Generation failed.'
-        if e.code == 402 or 'credit' in err.lower():
-            show_buy_credits(err)
-        else:
-            dialog.ok('Error', err)
-    except Exception as e:
-        progress.close()
-        dialog.ok('Error', str(e))
+    qr_url = f'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={urllib.parse.quote(url)}'
+    choice = dialog.select('Percfect App — Free Images', [
+        'Show QR code (scan on phone)',
+        'Fire Stick: open Silk Browser instructions',
+    ])
+    if choice == 0:
+        xbmc.executebuiltin(f'ShowPicture({qr_url})')
+        dialog.ok(
+            'Percfect App',
+            'Scan the QR code,\nor on Fire Stick open [B]Silk Browser[/B] and go to:\n\n'
+            f'  [B]percfectai.com/app[/B]\n\n'
+            'MAKE tab = free Perchance images (batch of 10)\n'
+            'ANIMATE tab = 480p xAI video'
+        )
+    elif choice == 1:
+        dialog.ok(
+            'Fire Stick Setup',
+            '1. Open [B]Silk Browser[/B] on your Fire Stick\n'
+            '2. Type: [B]percfectai.com/app[/B]\n'
+            '3. Bookmark it (menu → Add bookmark)\n'
+            '4. Tap [B]📱 Phone[/B] in the app to connect for video\n\n'
+            'Images are [B]free[/B] — no credits needed.'
+        )
 
 
 def generate_video():
@@ -243,8 +224,8 @@ def generate_video():
         if not path:
             return
         source_image = file_to_data_uri(path)
-    durations = ['5 seconds', '6 seconds', '10 seconds', '15 seconds']
-    dur_secs = [5, 6, 10, 15]
+    durations = ['5 seconds (480p)', '6 seconds (480p)', '10 seconds (480p)']
+    dur_secs = [5, 6, 10]
     idx = dialog.select(f'Video length ({vid_c}s available)', durations)
     if idx < 0:
         return
@@ -264,7 +245,7 @@ def generate_video():
         time.sleep(2)
         progress.update(pct, f'Generating {duration}s video... {pct}%')
     try:
-        payload = {'prompt': prompt, 'duration': duration}
+        payload = {'prompt': prompt, 'duration': duration, 'resolution': '480p'}
         if source_image:
             payload['image_url'] = source_image
         data = api_request('POST', '/api/generate/video', payload, timeout=200)
@@ -310,7 +291,7 @@ def show_buy_credits(message=''):
 
 def show_local_saves():
     folder = get_save_folder()
-    xbmcplugin.setPluginCategory(HANDLE, 'Saved on this device')
+    xbmcplugin.setPluginCategory(HANDLE, 'My Percfect Pics')
     xbmcplugin.setContent(HANDLE, 'videos')
     try:
         names = sorted(os.listdir(folder), reverse=True)
@@ -366,12 +347,15 @@ def main_menu():
     if not api_key:
         dialog = xbmcgui.Dialog()
         choice = dialog.select('Welcome to PercfectStudios', [
-            'Scan QR code to sign up / log in (recommended)',
-            'Enter PIN manually (already scanned on phone)',
+            '✦ Open Percfect App (free images — no login)',
+            'Scan QR to sign up (for 480p video)',
+            'Enter PIN manually',
         ])
-        if choice == 0 and activate():
+        if choice == 0:
+            open_percfect_app()
+        elif choice == 1 and activate():
             xbmc.executebuiltin('Container.Refresh')
-        elif choice == 1 and verify_pin():
+        elif choice == 2 and verify_pin():
             xbmc.executebuiltin('Container.Refresh')
         return
 
@@ -379,11 +363,10 @@ def main_menu():
     xbmcplugin.setPluginCategory(HANDLE, f'PercfectStudios — {credits_header(credits)}')
     xbmcplugin.setContent(HANDLE, 'videos')
     for label, action in [
-        ('Generate Image', 'generate_image'),
-        ('Generate Video', 'generate_video'),
-        ('My Gallery (cloud)', 'gallery'),
-        ('Saved on Device', 'local_saves'),
-        ('Buy Credits', 'buy_credits'),
+        ('✦ Open Percfect App (free images)', 'open_app'),
+        ('▶ Animate Video (480p xAI)', 'generate_video'),
+        ('My Percfect Pics (on device)', 'local_saves'),
+        ('Buy Video Credits', 'buy_credits'),
         ('Refresh Credits', 'refresh'),
         ('Settings', 'settings'),
         ('Disconnect', 'disconnect'),
@@ -399,8 +382,8 @@ if len(sys.argv) > 2 and sys.argv[2]:
     params = dict(urllib.parse.parse_qsl(sys.argv[2].lstrip('?')))
 action = params.get('action', '')
 
-if action == 'generate_image':
-    generate_image()
+if action == 'open_app':
+    open_percfect_app()
 elif action == 'generate_video':
     generate_video()
 elif action == 'gallery':

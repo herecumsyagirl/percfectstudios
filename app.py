@@ -1083,34 +1083,10 @@ def require_api_key(f):
 @app.route("/api/generate/image", methods=["POST"])
 @require_api_key
 def api_generate_image():
-    user = g.api_user
-    if user["picture_credits"] <= 0:
-        return jsonify({"error": "No image credits remaining."}), 402
-
-    body = request.get_json(silent=True) or {}
-    prompt = body.get("prompt", "").strip()
-    source_image = (body.get("image_url") or "").strip() or None
-    if not prompt:
-        return jsonify({"error": "prompt is required"}), 400
-
-    try:
-        result = generate_image_xai(prompt, source_image)
-        image_url = result["data"][0]["url"]
-
-        supabase.table("users").update({
-            "picture_credits": user["picture_credits"] - 1,
-            "images_today": user["images_today"] + 1,
-        }).eq("id", user["id"]).execute()
-
-        supabase.table("generations").insert({
-            "user_id": user["id"], "type": "image",
-            "prompt": prompt, "output_url": image_url,
-            "created_at": datetime.datetime.utcnow().isoformat(),
-        }).execute()
-
-        return jsonify({"url": image_url, "type": "image"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify({
+        "error": "Images are free via Perchance. Open percfectai.com/app → MAKE tab.",
+        "redirect": "https://percfectai.com/app",
+    }), 410
 
 
 @app.route("/api/generate/video", methods=["POST"])
