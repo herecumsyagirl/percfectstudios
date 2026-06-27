@@ -1635,11 +1635,12 @@ def character_generate_one():
 @app.route("/studios/percfectcharacter/finalize", methods=["POST"])
 @login_required
 def character_finalize():
-    """Step 2 (after approval): generate the other 3 shots + 360 spin, then save the
-    character to the roster. Costs 3 image credits + 6 video seconds."""
+    """Step 2 (after approval): generate the other 3 shots and save the character to the
+    roster. Costs 3 image credits. The 360 spin is a separate request (generate-spin) so
+    neither call exceeds the proxy timeout."""
     reset_daily_if_needed(current_user.id)
     res = supabase.table("users").select(
-        "picture_credits,video_credits,images_today,videos_today"
+        "picture_credits,images_today"
     ).eq("id", current_user.id).single().execute()
     u = res.data
 
@@ -1651,9 +1652,9 @@ def character_finalize():
     if not primary:
         return jsonify({"error": "Approve a shot first."}), 400
 
-    extra_n, vid_dur = 3, 6
-    if not current_user.is_admin and (u["picture_credits"] < extra_n or u["video_credits"] < vid_dur):
-        return jsonify({"error": f"You need {extra_n} image credits + {vid_dur} video seconds to build the full character. Buy credits or redeem a coupon code."}), 402
+    extra_n = 3
+    if not current_user.is_admin and u["picture_credits"] < extra_n:
+        return jsonify({"error": f"You need {extra_n} image credits to build the full character. Buy credits or redeem a coupon code."}), 402
 
     try:
         # 3 more shots — image-edits of the approved shot so they stay consistent
@@ -1666,34 +1667,20 @@ def character_finalize():
             except Exception:
                 pass
 
-        # 360 spin from the approved shot
-        sv = generate_video_xai(CHARACTER_SPIN_PROMPT, primary, vid_dur)
-        spin_url = (sv.get("video") or {}).get("url") \
-            or sv.get("url") or (sv.get("data") or [{}])[0].get("url")
-
         if not current_user.is_admin:
             spent_img = len(images) - 1
             supabase.table("users").update({
                 "picture_credits": max(0, u["picture_credits"] - spent_img),
-                "video_credits": max(0, u["video_credits"] - vid_dur),
                 "images_today": u["images_today"] + spent_img,
-                "videos_today": u["videos_today"] + 1,
             }).eq("id", current_user.id).execute()
 
         row = supabase.table("characters").insert({
             "user_id": current_user.id, "name": name, "gender": gender,
             "images": images, "primary_image_url": primary,
-            "spin_video_url": spin_url, "prompt": prompt, "source_mode": source_mode,
+            "spin_video_url": None, "prompt": prompt, "source_mode": source_mode,
         }).execute()
 
-        supabase.table("generations").insert({
-            "user_id": current_user.id, "type": "video",
-            "prompt": CHARACTER_SPIN_PROMPT, "output_url": spin_url,
-            "created_at": datetime.datetime.utcnow().isoformat(),
-        }).execute()
-
-        return jsonify({"ok": True, "character": _serialize_character(row.data[0]),
-                        "images": images, "spin_url": spin_url})
+        return jsonify({"ok": True, "character": _serialize_character(row.data[0]), "images": images})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

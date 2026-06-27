@@ -84,7 +84,7 @@
 
       <!-- finalize progress -->
       <div class="progress-wrap" id="fin-wrap" style="display:none">
-        <div class="progress-top"><span>Building the other 3 shots + 360°…</span><span class="progress-time"><span id="fin-elapsed">0</span>s</span></div>
+        <div class="progress-top"><span id="fin-label">Building the other 3 shots…</span><span class="progress-time"><span id="fin-elapsed">0</span>s</span></div>
         <div class="progress-track"><div class="progress-bar" id="fin-bar"></div></div>
         <div class="progress-hint">Usually 60–120 seconds · do not refresh</div>
       </div>
@@ -282,7 +282,10 @@ function approveOne(){ requireAuth(_approveOne); }
 async function _approveOne(){
   if(!state.candidate){ err('review-err','Generate a shot first.'); return; }
   hide('review-err'); hide('fin-err');
-  startFinProgress();
+  startFinProgress('Building the other 3 shots…');
+
+  // Phase 1 — build the other 3 shots + save the character
+  let charId=null;
   const fd=new FormData();
   fd.append('primary_image_url',state.candidate);
   fd.append('prompt',state.prompt||'');
@@ -292,17 +295,32 @@ async function _approveOne(){
   try{
     const res=await fetch('/studios/percfectcharacter/finalize',{method:'POST',body:fd});
     const data=await res.json();
-    if(!res.ok){ err('fin-err',data.error||'Build failed.'); return; }
+    if(!res.ok){ err('fin-err',data.error||'Build failed.'); stopFinProgress(); return; }
     hide('review-section');
     document.getElementById('final-grid').innerHTML=(data.images||[]).map(u=>`<div class="shot"><img src="${u}" alt=""></div>`).join('');
-    if(data.spin_url){ const v=document.getElementById('final-spin'); v.src=data.spin_url; v.play().catch(()=>{}); }
     show('final-section');
-    adjCredit('img-credits',-3); adjCredit('vid-credits',-6);
+    adjCredit('img-credits',-3);
+    charId=data.character.id;
     loadRoster();
-  }catch(e){ err('fin-err','Network error — please try again.'); }
+  }catch(e){ err('fin-err','Network error — please try again.'); stopFinProgress(); return; }
+
+  // Phase 2 — 360 spin (separate request so we stay under the proxy timeout)
+  setFinLabel('Creating the 360° spin…');
+  try{
+    const fd2=new FormData(); fd2.append('character_id',charId);
+    const res2=await fetch('/studios/percfectcharacter/generate-spin',{method:'POST',body:fd2});
+    const d2=await res2.json();
+    if(res2.ok && d2.url){
+      const v=document.getElementById('final-spin'); v.src=d2.url; v.play().catch(()=>{});
+      adjCredit('vid-credits',-6); loadRoster();
+    } else {
+      err('fin-err',(d2.error||'The 360° spin failed — your character is saved.'));
+    }
+  }catch(e){ err('fin-err','The 360° spin timed out — your character is saved; you can retry from your roster.'); }
   finally{ stopFinProgress(); }
 }
-function startFinProgress(){ let el=0; const MAX=120; show('fin-wrap'); document.getElementById('fin-bar').style.width='0%'; document.getElementById('fin-elapsed').textContent='0'; finTimer=setInterval(()=>{ el++; document.getElementById('fin-elapsed').textContent=el; document.getElementById('fin-bar').style.width=Math.min(95,(el/MAX)*100)+'%'; },1000); }
+function setFinLabel(t){ const e=document.getElementById('fin-label'); if(e) e.textContent=t; }
+function startFinProgress(label){ let el=0; const MAX=120; setFinLabel(label||'Building…'); show('fin-wrap'); document.getElementById('fin-bar').style.width='0%'; document.getElementById('fin-elapsed').textContent='0'; finTimer=setInterval(()=>{ el++; document.getElementById('fin-elapsed').textContent=el; document.getElementById('fin-bar').style.width=Math.min(95,(el/MAX)*100)+'%'; },1000); }
 function stopFinProgress(){ if(finTimer){clearInterval(finTimer);finTimer=null;} const b=document.getElementById('fin-bar'); if(b)b.style.width='100%'; setTimeout(()=>hide('fin-wrap'),400); }
 
 /* ── Reset ── */
@@ -331,6 +349,7 @@ async function loadRoster(){
         ? `<a class="rbtn" href="/studios/percfectcharacter/download/${c.id}">↓ Download</a>`
         : `<a class="rbtn locked" href="/buy-credits" title="Buy credits to unlock">🔒 Download</a>`;
       const spin = c.spin_video_url ? '<span class="rchar-badge">360°</span>' : '';
+      const spinBtn = c.spin_video_url ? '' : `<button class="rbtn" id="rspin-${c.id}" onclick="rosterSpin(${c.id})">🎥 360°</button>`;
       return `<div class="rchar">
         <div class="rchar-img"><img src="${c.primary_image_url}" alt="">${spin}</div>
         <div class="rchar-body">
@@ -338,6 +357,7 @@ async function loadRoster(){
           <div class="rchar-meta">${c.gender||''}${c.spin_video_url?' · has spin':''}</div>
           <div class="rchar-actions">
             <button class="rbtn" onclick='openEdit(${JSON.stringify(c)})'>✎ Edit</button>
+            ${spinBtn}
             ${dl}
             <button class="rbtn danger" onclick="deleteChar(${c.id})">🗑</button>
           </div>
@@ -347,6 +367,17 @@ async function loadRoster(){
   }catch(e){}
 }
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+async function rosterSpin(id){
+  const b=document.getElementById('rspin-'+id); if(b){ b.disabled=true; b.textContent='…'; }
+  const fd=new FormData(); fd.append('character_id',id);
+  try{
+    const res=await fetch('/studios/percfectcharacter/generate-spin',{method:'POST',body:fd});
+    const d=await res.json();
+    if(res.ok && d.url){ adjCredit('vid-credits',-6); loadRoster(); }
+    else { alert(d.error||'Spin failed.'); if(b){ b.disabled=false; b.textContent='🎥 360°'; } }
+  }catch(e){ if(b){ b.disabled=false; b.textContent='🎥 360°'; } }
+}
 
 async function deleteChar(id){
   if(!confirm('Delete this character?')) return;
