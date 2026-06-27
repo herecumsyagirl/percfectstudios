@@ -1,176 +1,142 @@
 {% extends "base.html" %}
-{% block title %}Percfect Characters · Build, Spin & Animate AI Characters{% endblock %}
+{% block title %}Percfect Characters · Build Your Character{% endblock %}
 
 {% block content %}
 
 <!-- ── Hero ─────────────────────────────────────────────── -->
 <div class="studio-hero char-hero">
   <div class="container">
-    <div class="hero-badge"><span class="badge-dot"></span>&nbsp;Two characters · 360° spin · action scenes</div>
+    <div class="hero-badge"><span class="badge-dot"></span>&nbsp;Build · Spin · Save · Battle</div>
     <h1>Percfect <span class="hero-grad">Characters</span></h1>
-    <p class="hero-sub">Build two characters from a photo or a description, spin them in 360°, then pick an action and watch them come to life together.</p>
+    <p class="hero-sub">Create a character from a photo or a description, get 4 shots, spin it in 360°, and save it to your roster. Then take them to The Arena.</p>
 
     <div class="hero-credits">
       {% if user %}
         <span class="credit-badge"><span class="dot"></span><span id="img-credits">{{ user.picture_credits }}</span> image credits</span>
         <span class="credit-badge"><span class="dot" style="background:var(--accent-3)"></span><span id="vid-credits">{{ user.video_credits }}</span> video credits</span>
         <a href="/buy-credits" class="btn-accent" style="padding:.45rem 1.2rem;font-size:.85rem;">+ Buy credits</a>
+        <a href="/settings?tab=offers" class="btn-outline-accent" style="padding:.45rem 1.2rem;font-size:.85rem;">Redeem coupon</a>
       {% else %}
-        <span class="credit-badge free-badge"><span class="badge-dot pulse"></span>Sign up free to start building</span>
+        <span class="credit-badge free-badge"><span class="badge-dot pulse"></span>Buy credits or redeem a coupon code to create</span>
       {% endif %}
     </div>
   </div>
 </div>
 
-<!-- ── Character builders ─────────────────────────────────── -->
-<div class="container mb-5">
-  <div class="row g-4">
+<!-- ── Builder ───────────────────────────────────────────── -->
+<div class="container">
+  <div class="builder-wrap">
+    <div class="studio-panel">
+      <div class="panel-label">🎭&nbsp; Create a character</div>
 
-    {% for i in [1, 2] %}
-    <div class="col-lg-6">
-      <div class="studio-panel char-card" id="card-{{ i }}">
-        <div class="char-head">
-          <span class="char-num">{{ i }}</span>
-          <span class="char-title">{{ 'Character One' if i == 1 else 'Character Two' }}</span>
-          <span class="char-status" id="status-{{ i }}">Not started</span>
+      <!-- Gender -->
+      <label class="form-label">Is your character male or female?</label>
+      <div class="mode-toggle" style="margin-bottom:1.25rem">
+        <button class="mode-btn" id="gender-male" onclick="setGender('male')">♂ Male</button>
+        <button class="mode-btn" id="gender-female" onclick="setGender('female')">♀ Female</button>
+      </div>
+
+      <!-- Source mode -->
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="mode-describe" onclick="setMode('describe')">✍️ Describe</button>
+        <button class="mode-btn" id="mode-upload" onclick="setMode('upload')">🖼 Upload photo</button>
+      </div>
+
+      <div class="mode-pane" id="describe-pane">
+        <label class="form-label">Describe your character</label>
+        <textarea class="form-control" id="desc" rows="3"
+          placeholder="A brave young knight with silver armor, short brown hair, a red cape and a kind smile…"></textarea>
+      </div>
+
+      <div class="mode-pane" id="upload-pane" style="display:none">
+        <label class="form-label">Upload a reference photo</label>
+        <div class="drop-zone" id="drop" onclick="document.getElementById('file').click()">
+          <span id="drop-label">Drop a photo here or click to upload</span>
+          <img id="drop-preview" src="" alt="" style="display:none;max-height:90px;border-radius:8px;margin-top:.5rem;" />
         </div>
+        <input type="file" id="file" accept="image/*" style="display:none" onchange="handleFile(this)" />
+      </div>
 
-        <!-- Mode toggle -->
-        <div class="mode-toggle">
-          <button class="mode-btn active" id="mode-describe-{{ i }}" onclick="setMode({{ i }},'describe')">✍️ Describe</button>
-          <button class="mode-btn" id="mode-upload-{{ i }}" onclick="setMode({{ i }},'upload')">🖼 Upload photo</button>
-        </div>
+      <button class="generate-btn" id="shots-btn" onclick="generateShots()">
+        <span class="btn-text">✦ Generate 4 shots</span>
+        <span class="btn-spinner" style="display:none">Generating…</span>
+      </button>
+      <p class="credit-note">4 image credits · pick your favorite as the main shot</p>
+      <div id="shots-err" class="gen-error" style="display:none"></div>
 
-        <!-- Describe pane -->
-        <div class="mode-pane" id="describe-pane-{{ i }}">
-          <label class="form-label">Describe your character</label>
-          <textarea class="form-control" id="desc-{{ i }}" rows="3"
-            placeholder="A brave young knight with silver armor, short brown hair, a red cape and a kind smile…"></textarea>
-        </div>
+      <!-- Shots -->
+      <div id="shots-section" style="display:none">
+        <div class="shimmer-overlay" id="shots-shimmer" style="position:static;height:0"></div>
+        <div class="shots-grid" id="shots-grid"></div>
 
-        <!-- Upload pane -->
-        <div class="mode-pane" id="upload-pane-{{ i }}" style="display:none">
-          <label class="form-label">Upload a reference photo</label>
-          <div class="drop-zone" id="drop-{{ i }}" onclick="document.getElementById('file-{{ i }}').click()">
-            <span id="drop-label-{{ i }}">Drop a photo here or click to upload</span>
-            <img id="drop-preview-{{ i }}" src="" alt="" style="display:none;max-height:90px;border-radius:8px;margin-top:.5rem;" />
-          </div>
-          <input type="file" id="file-{{ i }}" accept="image/*" style="display:none" onchange="handleFile({{ i }}, this)" />
-        </div>
+        <label class="form-label mt-3">Name your character</label>
+        <input class="form-control" id="char-name" placeholder="e.g. Sir Galahad" maxlength="80" />
 
-        <button class="generate-btn" id="gen-btn-{{ i }}" onclick="generateCharacter({{ i }})">
-          <span class="btn-text">✦ Generate character</span>
-          <span class="btn-spinner" style="display:none">Generating…</span>
+        <button class="generate-btn mt-3" id="save-btn" onclick="saveCharacter()">
+          <span class="btn-text">💾 Save character</span>
+          <span class="btn-spinner" style="display:none">Saving…</span>
         </button>
-        <p class="credit-note">1 image credit</p>
+        <div id="save-err" class="gen-error" style="display:none"></div>
+      </div>
 
-        <div class="output-area" id="out-{{ i }}">
-          <div class="output-placeholder" id="ph-{{ i }}">
-            <div class="placeholder-grid">
-              <div class="ph-tile" style="background:linear-gradient(135deg,#1a0a3e,#3d1a6e)"></div>
-              <div class="ph-tile" style="background:linear-gradient(135deg,#0a1a2e,#1a3d6e)"></div>
-              <div class="ph-tile" style="background:linear-gradient(135deg,#1a2e0a,#3d6e1a)"></div>
-              <div class="ph-tile" style="background:linear-gradient(135deg,#2e0a1a,#6e1a3d)"></div>
-            </div>
-            <p class="ph-text">Your character will appear here</p>
-          </div>
-          <div class="shimmer-overlay" id="shimmer-{{ i }}"></div>
-          <img id="img-{{ i }}" src="" alt="" />
+      <!-- After save: spin -->
+      <div id="post-save" style="display:none">
+        <div class="approved-pill">✓ Saved to your roster</div>
+        <button class="generate-btn generate-btn-video" id="spin-btn" onclick="spinCurrent()">
+          <span class="btn-text">🎥 Create 360° spin</span>
+          <span class="btn-spinner" style="display:none">Generating… (~60s)</span>
+        </button>
+        <p class="credit-note">6 video seconds · loops like a character-select screen</p>
+
+        <div class="progress-wrap" id="spin-wrap" style="display:none">
+          <div class="progress-top"><span>Spinning…</span><span class="progress-time"><span id="spin-elapsed">0</span>s</span></div>
+          <div class="progress-track"><div class="progress-bar" id="spin-bar"></div></div>
+          <div class="progress-hint">Usually 60–120 seconds · do not refresh</div>
         </div>
-        <div id="img-err-{{ i }}" class="gen-error" style="display:none"></div>
-
-        <!-- Review -->
-        <div class="review-row" id="review-{{ i }}" style="display:none">
-          <button class="btn-accent" onclick="approveCharacter({{ i }})">✓ Approve character</button>
-          <button class="btn-outline-accent" onclick="generateCharacter({{ i }})">↻ Regenerate</button>
+        <div class="output-area spin-out" id="spin-out" style="display:none;min-height:auto;margin-top:.75rem;">
+          <video id="spin-vid" controls loop muted playsinline></video>
         </div>
+        <div id="spin-err" class="gen-error" style="display:none"></div>
 
-        <!-- Spin -->
-        <div class="spin-sec" id="spin-sec-{{ i }}" style="display:none">
-          <div class="approved-pill">✓ Character approved</div>
-          <button class="generate-btn generate-btn-video" id="spin-btn-{{ i }}" onclick="generateSpin({{ i }})">
-            <span class="btn-text">🎥 Create 360° spin</span>
-            <span class="btn-spinner" style="display:none">Generating… (~60s)</span>
-          </button>
-          <p class="credit-note">6 video seconds · optional</p>
-
-          <div class="progress-wrap" id="spin{{ i }}-wrap" style="display:none">
-            <div class="progress-top">
-              <span>Spinning your character…</span>
-              <span class="progress-time"><span id="spin{{ i }}-elapsed">0</span>s</span>
-            </div>
-            <div class="progress-track"><div class="progress-bar" id="spin{{ i }}-bar"></div></div>
-            <div class="progress-hint">Usually 60–120 seconds · do not refresh</div>
-          </div>
-
-          <div class="output-area spin-out" id="spin-out-{{ i }}" style="display:none;min-height:auto;margin-top:.75rem;">
-            <video id="spin-vid-{{ i }}" controls loop muted playsinline></video>
-          </div>
-          <div id="spin-err-{{ i }}" class="gen-error" style="display:none"></div>
-        </div>
-
+        <button class="btn-outline-accent w-100 mt-3" onclick="resetBuilder()">＋ Create another character</button>
       </div>
     </div>
-    {% endfor %}
-
   </div>
 </div>
 
-<!-- ── Action scene ──────────────────────────────────────── -->
-<div class="container mb-6">
-  <div class="studio-panel action-section">
-    <div class="panel-label">🎬&nbsp; Bring them together</div>
+<!-- ── Roster ────────────────────────────────────────────── -->
+<div class="container mt-5 mb-4">
+  <div class="roster-head">
+    <p class="section-label" style="margin:0">Your characters</p>
+    <a href="/studios/percfectcharacter/arena" class="btn-accent arena-btn">⚔ Enter The Arena →</a>
+  </div>
+  <div id="roster-empty" class="roster-empty" style="display:none">No characters yet — build your first one above.</div>
+  <div class="roster-grid" id="roster-grid"></div>
+</div>
 
-    <div class="action-lock" id="action-lock">
-      <span class="lock-icon">🔒</span>
-      <p>Approve <strong>both</strong> characters above to unlock action scenes.</p>
-    </div>
-
-    <div class="action-body" id="action-body" style="display:none">
-      <p class="section-label">Choose an action</p>
-      <div class="action-grid">
-        {% for key, a in actions.items() %}
-        <button class="action-chip" id="action-chip-{{ key }}" onclick="selectAction('{{ key }}')">
-          <span class="action-emoji">{{ a.emoji }}</span>
-          <span>{{ a.label }}</span>
+<!-- ── Edit modal ────────────────────────────────────────── -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:460px">
+    <div class="modal-content" style="background:var(--bg-2);border:1px solid var(--border-2);border-radius:20px;">
+      <div class="modal-body p-4">
+        <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);opacity:.5;position:absolute;top:1.25rem;right:1.25rem;"></button>
+        <h5 style="font-weight:700;margin-bottom:1.25rem;">Edit character</h5>
+        <input type="hidden" id="edit-id" />
+        <label class="form-label">Name</label>
+        <input class="form-control mb-3" id="edit-name" maxlength="80" />
+        <label class="form-label">Gender</label>
+        <div class="mode-toggle" style="margin-bottom:1rem">
+          <button class="mode-btn" id="edit-gender-male" onclick="setEditGender('male')">♂ Male</button>
+          <button class="mode-btn" id="edit-gender-female" onclick="setEditGender('female')">♀ Female</button>
+        </div>
+        <label class="form-label">Adjust the picture <span class="form-hint">optional · 1 image credit</span></label>
+        <input class="form-control mb-3" id="edit-adjust" placeholder="e.g. give them golden armor and a blue cape" />
+        <div id="edit-err" class="gen-error" style="display:none;margin-bottom:.75rem"></div>
+        <button class="generate-btn" id="edit-save-btn" onclick="saveEdit()">
+          <span class="btn-text">Save changes</span>
+          <span class="btn-spinner" style="display:none">Saving…</span>
         </button>
-        {% endfor %}
       </div>
-
-      <button class="generate-btn generate-btn-video mt-3" id="action-btn" onclick="generateAction()" disabled>
-        <span class="btn-text">▶ Generate action video</span>
-        <span class="btn-spinner" style="display:none">Generating… (~90s)</span>
-      </button>
-      <p class="credit-note">6 video seconds</p>
-
-      <div class="progress-wrap" id="action-wrap" style="display:none">
-        <div class="progress-top">
-          <span>Creating your scene…</span>
-          <span class="progress-time"><span id="action-elapsed">0</span>s</span>
-        </div>
-        <div class="progress-track"><div class="progress-bar" id="action-bar"></div></div>
-        <div class="progress-hint">Usually 60–120 seconds · do not refresh</div>
-      </div>
-
-      <div class="output-area" id="action-out">
-        <div class="output-placeholder" id="action-ph">
-          <div class="placeholder-grid">
-            <div class="ph-tile" style="background:linear-gradient(135deg,#0a2e2e,#1a6e6e)"></div>
-            <div class="ph-tile" style="background:linear-gradient(135deg,#2e1a0a,#6e4e1a)"></div>
-            <div class="ph-tile" style="background:linear-gradient(135deg,#1a0a2e,#4e1a6e)"></div>
-            <div class="ph-tile" style="background:linear-gradient(135deg,#0a2e0a,#1a6e3d)"></div>
-          </div>
-          <p class="ph-text">Your action scene will appear here</p>
-        </div>
-        <div class="shimmer-overlay" id="action-shimmer"></div>
-        <video id="action-vid" controls loop playsinline></video>
-      </div>
-
-      <div class="output-actions" id="action-actions" style="display:none">
-        <a id="action-dl" href="#" download="percfect-characters.mp4" class="btn-outline-accent btn-sm">↓ Download</a>
-        <button type="button" class="btn-share-x btn-sm" onclick="shareToX(document.getElementById('action-vid').src,'video','Percfect Characters action scene')">𝕏 Post to X</button>
-      </div>
-      <div id="action-err" class="gen-error" style="display:none"></div>
     </div>
   </div>
 </div>
@@ -179,80 +145,49 @@
 
 {% block scripts %}
 <style>
-.char-hero { padding: 3.5rem 1rem 2rem; position: relative; text-align: center; }
-.char-hero::before {
-  content:''; position:absolute; top:-10%; left:50%; transform:translateX(-50%);
-  width:700px; height:700px; border-radius:50%;
-  background:radial-gradient(circle,rgba(124,92,252,.14) 0%,transparent 65%); pointer-events:none;
-}
-.hero-badge {
-  display:inline-flex; align-items:center; gap:.4rem;
-  background:rgba(124,92,252,.1); border:1px solid rgba(124,92,252,.25);
-  border-radius:99px; padding:.3rem 1rem; margin-bottom:1.25rem;
-  font-family:var(--font-mono); font-size:.72rem; color:var(--accent-3); letter-spacing:.06em;
-}
+.char-hero { padding:3rem 1rem 1.75rem; position:relative; text-align:center; }
+.char-hero::before { content:''; position:absolute; top:-10%; left:50%; transform:translateX(-50%); width:700px; height:700px; border-radius:50%; background:radial-gradient(circle,rgba(124,92,252,.14) 0%,transparent 65%); pointer-events:none; }
+.hero-badge { display:inline-flex; align-items:center; gap:.4rem; background:rgba(124,92,252,.1); border:1px solid rgba(124,92,252,.25); border-radius:99px; padding:.3rem 1rem; margin-bottom:1.25rem; font-family:var(--font-mono); font-size:.72rem; color:var(--accent-3); letter-spacing:.06em; }
 .badge-dot { width:6px; height:6px; border-radius:50%; background:var(--accent-2); display:inline-block; }
 .badge-dot.pulse { animation:pulse 2s ease-in-out infinite; }
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.85)}}
 .char-hero h1 { font-size:clamp(2.2rem,6vw,3.6rem); font-weight:900; letter-spacing:-.05em; line-height:1.05; margin-bottom:1rem; }
 .hero-grad { background:linear-gradient(135deg,#fff 0%,var(--accent-3) 40%,var(--accent) 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
-.hero-sub { color:var(--text-muted); font-size:1rem; max-width:540px; margin:0 auto 1.75rem; }
-.hero-credits { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:.75rem; }
+.hero-sub { color:var(--text-muted); font-size:1rem; max-width:560px; margin:0 auto 1.75rem; }
+.hero-credits { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:.6rem; }
 .free-badge { border-color:rgba(124,92,252,.4)!important; color:var(--accent-2)!important; }
+.section-label { font-family:var(--font-mono); font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.12em; color:var(--text-muted); }
 
-.section-label { font-family:var(--font-mono); font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.12em; color:var(--text-muted); margin-bottom:.9rem; }
-
-/* Character card */
-.char-card { display:flex; flex-direction:column; }
-.char-head { display:flex; align-items:center; gap:.6rem; margin-bottom:1.25rem; }
-.char-num {
-  width:30px; height:30px; border-radius:50%; flex:0 0 auto;
-  background:var(--accent); color:#fff; font-weight:800; font-family:var(--font-mono);
-  display:flex; align-items:center; justify-content:center; font-size:.9rem;
-}
-.char-title { font-weight:800; font-size:1.1rem; letter-spacing:-.02em; }
-.char-status { margin-left:auto; font-family:var(--font-mono); font-size:.7rem; color:var(--text-muted); border:1px solid var(--border-2); border-radius:99px; padding:.2rem .7rem; }
-.char-status.approved { color:var(--success); border-color:rgba(52,211,153,.4); }
-
-/* Mode toggle */
+.builder-wrap { max-width:720px; margin:0 auto; }
 .mode-toggle { display:flex; background:var(--bg-3); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:1rem; }
-.mode-btn { flex:1; padding:.5rem; border:none; border-radius:9px; background:transparent; color:var(--text-muted); font-family:var(--font-main); font-weight:600; font-size:.85rem; cursor:pointer; transition:all .2s; }
+.mode-btn { flex:1; padding:.55rem; border:none; border-radius:9px; background:transparent; color:var(--text-muted); font-family:var(--font-main); font-weight:600; font-size:.9rem; cursor:pointer; transition:all .2s; }
 .mode-btn.active { background:var(--accent); color:#fff; }
-
 .mode-pane { margin-bottom:1rem; }
 .drop-zone { border:2px dashed var(--border-2); border-radius:12px; padding:1.5rem; text-align:center; cursor:pointer; transition:all .2s; color:var(--text-muted); font-size:.85rem; background:var(--bg-3); }
-.drop-zone:hover, .drop-zone.drag-over { border-color:var(--accent); background:rgba(124,92,252,.06); color:var(--accent-2); }
+.drop-zone:hover,.drop-zone.drag-over { border-color:var(--accent); background:rgba(124,92,252,.06); color:var(--accent-2); }
 .drop-zone.has-image { border-style:solid; border-color:var(--accent); }
 
-/* Generate button */
 .generate-btn { width:100%; padding:.75rem; border-radius:14px; border:none; cursor:pointer; background:linear-gradient(135deg,var(--accent),#5a3fcf); color:#fff; font-size:1rem; font-weight:700; font-family:var(--font-main); transition:all .2s; margin-bottom:.5rem; box-shadow:0 4px 24px rgba(124,92,252,.3); }
 .generate-btn:hover { transform:translateY(-2px); box-shadow:0 8px 32px rgba(124,92,252,.45); }
 .generate-btn:disabled { opacity:.55; transform:none; cursor:not-allowed; box-shadow:none; }
 .generate-btn-video { background:linear-gradient(135deg,#3d6ee8,#2a4fcf); box-shadow:0 4px 24px rgba(61,110,232,.3); }
-.generate-btn-video:hover { box-shadow:0 8px 32px rgba(61,110,232,.45); }
 .credit-note { font-size:.75rem; color:var(--text-muted); text-align:center; margin-bottom:1rem; }
+.form-hint { font-size:.72rem; color:var(--text-muted); font-weight:400; }
 
-/* Output */
-.output-area { background:var(--bg-3); border:1px solid var(--border); border-radius:var(--radius-lg); min-height:300px; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; }
-.output-area img, .output-area video { max-width:100%; max-height:460px; width:100%; border-radius:var(--radius); display:none; object-fit:contain; }
-.spin-out video { display:block!important; }
-.output-placeholder { text-align:center; width:100%; padding:1rem; }
-.placeholder-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px; width:150px; height:115px; margin:0 auto 1rem; border-radius:10px; overflow:hidden; opacity:.35; }
-.ph-tile { border-radius:3px; }
-.ph-text { font-size:.82rem; color:var(--text-muted); opacity:.6; margin:0; }
+.shots-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.6rem; margin-top:1rem; }
+.shot { position:relative; aspect-ratio:1; border-radius:12px; overflow:hidden; border:2px solid var(--border); cursor:pointer; transition:all .15s; background:var(--bg-3); }
+.shot img { width:100%; height:100%; object-fit:cover; }
+.shot:hover { border-color:var(--accent-2); }
+.shot.primary { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+.shot .pick { position:absolute; top:.3rem; right:.3rem; background:var(--accent); color:#fff; font-size:.62rem; padding:.1rem .4rem; border-radius:6px; opacity:0; }
+.shot.primary .pick { opacity:1; }
+@media(max-width:560px){ .shots-grid{ grid-template-columns:repeat(2,1fr);} }
 
-.shimmer-overlay { display:none; position:absolute; inset:0; background:linear-gradient(90deg,transparent 0%,rgba(124,92,252,.08) 50%,transparent 100%); background-size:200% 100%; animation:shimmer 1.5s infinite; }
-@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.output-area { background:var(--bg-3); border:1px solid var(--border); border-radius:var(--radius-lg); display:flex; align-items:center; justify-content:center; overflow:hidden; }
+.spin-out video { width:100%; max-height:420px; border-radius:var(--radius); object-fit:contain; }
+.approved-pill { display:inline-flex; align-items:center; gap:.4rem; color:var(--success); background:rgba(52,211,153,.1); border:1px solid rgba(52,211,153,.25); border-radius:99px; padding:.3rem .9rem; font-size:.78rem; font-weight:600; margin:1.25rem 0 .9rem; }
+.gen-error { background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.2); color:var(--danger); border-radius:10px; padding:.75rem 1rem; font-size:.85rem; margin-top:.5rem; }
 
-.gen-error { background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.2); color:var(--danger); border-radius:10px; padding:.75rem 1rem; font-size:.85rem; margin-top:.75rem; }
-
-.review-row { display:flex; gap:.6rem; margin-top:.9rem; }
-.review-row .btn-accent, .review-row .btn-outline-accent { flex:1; text-align:center; }
-
-.spin-sec { margin-top:1.25rem; padding-top:1.25rem; border-top:1px solid var(--border); }
-.approved-pill { display:inline-flex; align-items:center; gap:.4rem; color:var(--success); background:rgba(52,211,153,.1); border:1px solid rgba(52,211,153,.25); border-radius:99px; padding:.3rem .9rem; font-size:.78rem; font-weight:600; margin-bottom:.9rem; }
-
-/* Progress */
 .progress-wrap { margin:1rem 0; padding:1rem 1.25rem; background:var(--bg-3); border:1px solid var(--border); border-radius:14px; }
 .progress-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:.6rem; font-size:.85rem; font-weight:600; }
 .progress-time { font-family:var(--font-mono); font-size:.8rem; color:var(--accent-2); }
@@ -260,221 +195,212 @@
 .progress-bar { height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius:99px; transition:width 1s linear; }
 .progress-hint { font-size:.75rem; color:var(--text-muted); margin-top:.5rem; text-align:center; }
 
-/* Action section */
-.action-lock { text-align:center; padding:2.5rem 1rem; color:var(--text-muted); }
-.action-lock .lock-icon { font-size:2rem; display:block; margin-bottom:.75rem; opacity:.5; }
-.action-lock p { margin:0; font-size:.9rem; }
-.action-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:.6rem; margin-bottom:.5rem; }
-.action-chip { display:flex; flex-direction:column; align-items:center; gap:.35rem; padding:1rem .5rem; border-radius:14px; border:1px solid var(--border-2); background:var(--bg-3); color:var(--text); font-size:.85rem; font-weight:600; cursor:pointer; transition:all .15s; }
-.action-chip:hover { border-color:var(--accent); background:rgba(124,92,252,.06); transform:translateY(-2px); }
-.action-chip.selected { border-color:var(--accent); background:var(--accent); color:#fff; }
-.action-emoji { font-size:1.5rem; }
-.output-actions { display:flex; gap:.5rem; margin-top:.75rem; }
-.mb-6 { margin-bottom:4rem; }
-
-@media (max-width:768px){ .char-hero { padding:2rem 1rem 1.25rem; } }
+.roster-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; gap:1rem; flex-wrap:wrap; }
+.arena-btn { font-size:.95rem; padding:.6rem 1.4rem; }
+.roster-empty { color:var(--text-muted); font-size:.9rem; padding:2rem; text-align:center; border:1px dashed var(--border-2); border-radius:var(--radius-lg); }
+.roster-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:1rem; }
+.rchar { background:var(--bg-2); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; }
+.rchar-img { position:relative; aspect-ratio:1; background:var(--bg-3); }
+.rchar-img img { width:100%; height:100%; object-fit:cover; }
+.rchar-badge { position:absolute; top:.5rem; left:.5rem; background:rgba(0,0,0,.7); color:var(--accent-3); font-size:.62rem; font-family:var(--font-mono); padding:.15rem .5rem; border-radius:6px; }
+.rchar-body { padding:.75rem; }
+.rchar-name { font-weight:700; font-size:.95rem; margin-bottom:.1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rchar-meta { color:var(--text-muted); font-size:.72rem; margin-bottom:.6rem; }
+.rchar-actions { display:flex; flex-wrap:wrap; gap:.35rem; }
+.rbtn { flex:1; min-width:auto; padding:.35rem .5rem; border-radius:9px; border:1px solid var(--border-2); background:var(--bg-3); color:var(--text); font-size:.72rem; cursor:pointer; transition:all .15s; text-decoration:none; text-align:center; white-space:nowrap; }
+.rbtn:hover { border-color:var(--accent); color:var(--accent-3); }
+.rbtn.locked { opacity:.55; }
+.rbtn.danger:hover { border-color:var(--danger); color:var(--danger); }
 </style>
 
 <script>
 const LOGGED_IN = {{ 'true' if user else 'false' }};
+let canDownload = {{ 'true' if user and user.has_purchased else 'false' }};
+const state = { gender:null, mode:'describe', file:null, shots:[], primary:null, savedId:null };
+let editGender = null;
+let spinTimer = null;
 
-const chars = {
-  1: { mode:'describe', file:null, image:null, approved:false },
-  2: { mode:'describe', file:null, image:null, approved:false },
-};
-let selectedAction = null;
-const timers = {};
-
-/* ── Auth ──────────────────────────────────────────── */
+/* ── Auth ── */
 function onAuthSuccess(data){
   window.LOGGED_IN = true;
-  document.querySelectorAll('.hero-credits').forEach(el => {
-    el.innerHTML = `
-      <span class="credit-badge"><span class="dot"></span><span id="img-credits">${data.picture_credits}</span> image credits</span>
-      <span class="credit-badge"><span class="dot" style="background:var(--accent-3)"></span><span id="vid-credits">${data.video_credits}</span> video credits</span>
-      <a href="/buy-credits" class="btn-accent" style="padding:.45rem 1.2rem;font-size:.85rem;">+ Buy credits</a>`;
-  });
-  if (window._pending) { window._pending(); window._pending = null; }
+  const c = document.querySelector('.hero-credits');
+  if (c) c.innerHTML = `
+    <span class="credit-badge"><span class="dot"></span><span id="img-credits">${data.picture_credits}</span> image credits</span>
+    <span class="credit-badge"><span class="dot" style="background:var(--accent-3)"></span><span id="vid-credits">${data.video_credits}</span> video credits</span>
+    <a href="/buy-credits" class="btn-accent" style="padding:.45rem 1.2rem;font-size:.85rem;">+ Buy credits</a>
+    <a href="/settings?tab=offers" class="btn-outline-accent" style="padding:.45rem 1.2rem;font-size:.85rem;">Redeem coupon</a>`;
+  loadRoster();
+  if (window._pending){ window._pending(); window._pending=null; }
 }
-function requireAuth(fn){
-  if (LOGGED_IN || window.LOGGED_IN) { fn(); return; }
-  window._pending = fn;
-  openAuthModal('signup');
-}
+function requireAuth(fn){ if (LOGGED_IN||window.LOGGED_IN){ fn(); return; } window._pending=fn; openAuthModal('signup'); }
 
-/* ── Small helpers ─────────────────────────────────── */
+/* ── helpers ── */
 function show(id){ const e=document.getElementById(id); if(e) e.style.display=''; }
 function hide(id){ const e=document.getElementById(id); if(e) e.style.display='none'; }
-function showErr(id,msg){ const e=document.getElementById(id); if(e){ e.textContent=msg; e.style.display='block'; } }
-function setStatus(i,text,approved){
-  const e=document.getElementById('status-'+i);
-  if(!e) return; e.textContent=text;
-  e.classList.toggle('approved', !!approved);
-}
-function decCredit(id){ const e=document.getElementById(id); if(e){ const n=parseInt(e.textContent); if(!isNaN(n)) e.textContent=Math.max(0,n-1); } }
-function decVideo(id,secs){ const e=document.getElementById(id); if(e){ const n=parseInt(e.textContent); if(!isNaN(n)) e.textContent=Math.max(0,n-secs); } }
+function err(id,msg){ const e=document.getElementById(id); if(e){ e.textContent=msg; e.style.display='block'; } }
+function setBtn(id,on){ const b=document.getElementById(id); if(!b) return; b.disabled=on; b.querySelector('.btn-text').style.display=on?'none':''; b.querySelector('.btn-spinner').style.display=on?'':'none'; }
+function setCredit(id,v){ const e=document.getElementById(id); if(e&&!isNaN(v)) e.textContent=Math.max(0,v); }
+function adjCredit(id,d){ const e=document.getElementById(id); if(e){ const n=parseInt(e.textContent); if(!isNaN(n)) e.textContent=Math.max(0,n+d); } }
 
-function setBtnLoading(btnId, on, shimmerId){
-  const btn=document.getElementById(btnId);
-  if(btn){ btn.disabled=on; btn.querySelector('.btn-text').style.display=on?'none':''; btn.querySelector('.btn-spinner').style.display=on?'':'none'; }
-  if(shimmerId){ const s=document.getElementById(shimmerId); if(s) s.style.display=on?'block':'none'; }
-}
+/* ── Gender / mode ── */
+function setGender(g){ state.gender=g; document.getElementById('gender-male').classList.toggle('active',g==='male'); document.getElementById('gender-female').classList.toggle('active',g==='female'); }
+function setMode(m){ state.mode=m; document.getElementById('mode-describe').classList.toggle('active',m==='describe'); document.getElementById('mode-upload').classList.toggle('active',m==='upload'); document.getElementById('describe-pane').style.display=m==='describe'?'':'none'; document.getElementById('upload-pane').style.display=m==='upload'?'':'none'; }
 
-function startProgress(prefix){
-  let el=0; const MAX=120;
-  show(prefix+'-wrap');
-  document.getElementById(prefix+'-bar').style.width='0%';
-  document.getElementById(prefix+'-elapsed').textContent='0';
-  timers[prefix]=setInterval(()=>{
-    el++; document.getElementById(prefix+'-elapsed').textContent=el;
-    document.getElementById(prefix+'-bar').style.width=Math.min(95,(el/MAX)*100)+'%';
-  },1000);
-}
-function stopProgress(prefix){
-  if(timers[prefix]){ clearInterval(timers[prefix]); timers[prefix]=null; }
-  const b=document.getElementById(prefix+'-bar'); if(b) b.style.width='100%';
-  setTimeout(()=>hide(prefix+'-wrap'),400);
-}
+/* ── Upload ── */
+function handleFile(input){ if(input.files[0]) loadFile(input.files[0]); }
+function loadFile(file){ if(!file.type.startsWith('image/')) return; state.file=file; const r=new FileReader(); r.onload=e=>{ const p=document.getElementById('drop-preview'); p.src=e.target.result; p.style.display='block'; document.getElementById('drop-label').textContent=file.name; document.getElementById('drop').classList.add('has-image'); }; r.readAsDataURL(file); }
+(function(){ const z=document.getElementById('drop'); if(!z) return; z.addEventListener('dragover',e=>{e.preventDefault();z.classList.add('drag-over');}); z.addEventListener('dragleave',()=>z.classList.remove('drag-over')); z.addEventListener('drop',e=>{e.preventDefault();z.classList.remove('drag-over'); if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);}); })();
 
-/* ── Mode toggle ───────────────────────────────────── */
-function setMode(i, mode){
-  chars[i].mode = mode;
-  document.getElementById('mode-describe-'+i).classList.toggle('active', mode==='describe');
-  document.getElementById('mode-upload-'+i).classList.toggle('active', mode==='upload');
-  document.getElementById('describe-pane-'+i).style.display = mode==='describe' ? '' : 'none';
-  document.getElementById('upload-pane-'+i).style.display = mode==='upload' ? '' : 'none';
-}
-
-/* ── File upload / drag & drop ─────────────────────── */
-function handleFile(i, input){ if(input.files[0]) loadFile(i, input.files[0]); }
-function loadFile(i, file){
-  if(!file.type.startsWith('image/')) return;
-  chars[i].file = file;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const prev=document.getElementById('drop-preview-'+i);
-    prev.src=e.target.result; prev.style.display='block';
-    document.getElementById('drop-label-'+i).textContent=file.name;
-    document.getElementById('drop-'+i).classList.add('has-image');
-  };
-  reader.readAsDataURL(file);
-}
-[1,2].forEach(i => {
-  const zone=document.getElementById('drop-'+i);
-  if(!zone) return;
-  zone.addEventListener('dragover', e=>{ e.preventDefault(); zone.classList.add('drag-over'); });
-  zone.addEventListener('dragleave', ()=>zone.classList.remove('drag-over'));
-  zone.addEventListener('drop', e=>{ e.preventDefault(); zone.classList.remove('drag-over'); if(e.dataTransfer.files[0]) loadFile(i, e.dataTransfer.files[0]); });
-});
-
-/* ── Generate character image ──────────────────────── */
-function generateCharacter(i){ requireAuth(()=>_generateCharacter(i)); }
-async function _generateCharacter(i){
-  const st = chars[i];
-  const fd = new FormData();
-  if(st.mode==='upload'){
-    if(!st.file){ showErr('img-err-'+i,'Upload a photo first.'); return; }
-    fd.append('image_file', st.file);
-  } else {
-    const d = document.getElementById('desc-'+i).value.trim();
-    if(!d){ showErr('img-err-'+i,'Describe your character first.'); return; }
-    fd.append('description', d);
-  }
-  hide('img-err-'+i);
-  setBtnLoading('gen-btn-'+i, true, 'shimmer-'+i);
-  document.getElementById('ph-'+i).style.display='';
-  document.getElementById('img-'+i).style.display='none';
+/* ── Generate 4 shots ── */
+function generateShots(){ requireAuth(_generateShots); }
+async function _generateShots(){
+  if(!state.gender){ err('shots-err','Pick male or female first.'); return; }
+  const fd=new FormData();
+  fd.append('gender',state.gender);
+  if(state.mode==='upload'){ if(!state.file){ err('shots-err','Upload a photo first.'); return; } fd.append('image_file',state.file); }
+  else { const d=document.getElementById('desc').value.trim(); if(!d){ err('shots-err','Describe your character first.'); return; } fd.append('description',d); }
+  hide('shots-err'); setBtn('shots-btn',true);
   try{
-    const res = await fetch('/studios/percfectcharacter/generate-image', {method:'POST', body:fd});
-    const data = await res.json();
-    if(!res.ok){ showErr('img-err-'+i, data.error || 'Generation failed.'); return; }
-    const img = document.getElementById('img-'+i);
-    img.src = data.url;
-    img.onload = () => { img.style.display='block'; document.getElementById('ph-'+i).style.display='none'; };
-    st.image = data.url;
-    st.approved = false;
-    document.getElementById('review-'+i).style.display='flex';
-    document.getElementById('spin-sec-'+i).style.display='none';
-    setStatus(i,'Review', false);
-    decCredit('img-credits');
-    refreshActionLock();
-  }catch(e){ showErr('img-err-'+i,'Network error — please try again.'); }
-  finally{ setBtnLoading('gen-btn-'+i, false, 'shimmer-'+i); }
+    const res=await fetch('/studios/percfectcharacter/generate-shots',{method:'POST',body:fd});
+    const data=await res.json();
+    if(!res.ok){ err('shots-err',data.error||'Generation failed.'); return; }
+    state.shots=data.urls; state.prompt=data.prompt; state.primary=data.urls[0]; state.savedId=null;
+    renderShots();
+    show('shots-section'); hide('post-save');
+    adjCredit('img-credits',-(data.urls.length));
+  }catch(e){ err('shots-err','Network error — please try again.'); }
+  finally{ setBtn('shots-btn',false); }
 }
-
-/* ── Approve ───────────────────────────────────────── */
-function approveCharacter(i){
-  if(!chars[i].image) return;
-  chars[i].approved = true;
-  document.getElementById('review-'+i).style.display='none';
-  document.getElementById('spin-sec-'+i).style.display='block';
-  setStatus(i,'✓ Approved', true);
-  refreshActionLock();
+function renderShots(){
+  document.getElementById('shots-grid').innerHTML = state.shots.map((u,i)=>`
+    <div class="shot ${u===state.primary?'primary':''}" onclick="pickPrimary(${i})">
+      <img src="${u}" alt="shot ${i+1}"><span class="pick">MAIN</span>
+    </div>`).join('');
 }
+function pickPrimary(i){ state.primary=state.shots[i]; renderShots(); }
 
-/* ── 360 spin ──────────────────────────────────────── */
-function generateSpin(i){ requireAuth(()=>_generateSpin(i)); }
-async function _generateSpin(i){
-  const st = chars[i];
-  if(!st.image){ showErr('spin-err-'+i,'Approve a character first.'); return; }
-  hide('spin-err-'+i);
-  setBtnLoading('spin-btn-'+i, true);
-  startProgress('spin'+i);
-  const fd = new FormData();
-  fd.append('image_url', st.image);
+/* ── Save ── */
+function saveCharacter(){ requireAuth(_saveCharacter); }
+async function _saveCharacter(){
+  if(!state.primary){ err('save-err','Generate shots first.'); return; }
+  hide('save-err'); setBtn('save-btn',true);
+  const fd=new FormData();
+  fd.append('name',document.getElementById('char-name').value.trim());
+  fd.append('gender',state.gender||'');
+  fd.append('prompt',state.prompt||'');
+  fd.append('source_mode',state.mode);
+  fd.append('primary_image_url',state.primary);
+  fd.append('images',JSON.stringify(state.shots));
   try{
-    const res = await fetch('/studios/percfectcharacter/generate-spin', {method:'POST', body:fd});
-    const data = await res.json();
-    if(!res.ok){ showErr('spin-err-'+i, data.error || 'Generation failed.'); return; }
-    const vid = document.getElementById('spin-vid-'+i);
-    vid.src = data.url;
-    document.getElementById('spin-out-'+i).style.display='flex';
-    vid.play().catch(()=>{});
-    decVideo('vid-credits', 6);
-  }catch(e){ showErr('spin-err-'+i,'Network error — please try again.'); }
-  finally{ setBtnLoading('spin-btn-'+i, false); stopProgress('spin'+i); }
+    const res=await fetch('/studios/percfectcharacter/save',{method:'POST',body:fd});
+    const data=await res.json();
+    if(!res.ok){ err('save-err',data.error||'Save failed.'); return; }
+    state.savedId=data.character.id;
+    show('post-save');
+    hide('spin-out'); hide('spin-err');
+    document.getElementById('spin-vid').src='';
+    loadRoster();
+  }catch(e){ err('save-err','Network error — please try again.'); }
+  finally{ setBtn('save-btn',false); }
 }
 
-/* ── Action ────────────────────────────────────────── */
-function refreshActionLock(){
-  const ready = chars[1].approved && chars[2].approved;
-  document.getElementById('action-lock').style.display = ready ? 'none' : 'block';
-  document.getElementById('action-body').style.display = ready ? 'block' : 'none';
-}
-function selectAction(key){
-  selectedAction = key;
-  document.querySelectorAll('.action-chip').forEach(c => c.classList.remove('selected'));
-  document.getElementById('action-chip-'+key).classList.add('selected');
-  document.getElementById('action-btn').disabled = false;
-}
-function generateAction(){ requireAuth(_generateAction); }
-async function _generateAction(){
-  if(!selectedAction){ showErr('action-err','Pick an action first.'); return; }
-  if(!chars[1].image || !chars[2].image){ showErr('action-err','Approve both characters first.'); return; }
-  hide('action-err');
-  setBtnLoading('action-btn', true, 'action-shimmer');
-  startProgress('action');
-  document.getElementById('action-ph').style.display='';
-  document.getElementById('action-vid').style.display='none';
-  document.getElementById('action-actions').style.display='none';
-  const fd = new FormData();
-  fd.append('image_a', chars[1].image);
-  fd.append('image_b', chars[2].image);
-  fd.append('action', selectedAction);
+/* ── Spin ── */
+function spinCurrent(){ requireAuth(()=>doSpin(state.savedId,'spin-btn','spin-out','spin-vid','spin-err','spin')); }
+async function doSpin(id,btnId,outId,vidId,errId,prefix){
+  if(!id) return;
+  hide(errId); setBtn(btnId,true); startProgress(prefix);
+  const fd=new FormData(); fd.append('character_id',id);
   try{
-    const res = await fetch('/studios/percfectcharacter/generate-action', {method:'POST', body:fd});
-    const data = await res.json();
-    if(!res.ok){ showErr('action-err', data.error || 'Generation failed.'); return; }
-    const vid = document.getElementById('action-vid');
-    vid.src = data.url;
-    vid.style.display='block';
-    document.getElementById('action-ph').style.display='none';
-    document.getElementById('action-dl').href = data.url;
-    document.getElementById('action-actions').style.display='flex';
-    vid.play().catch(()=>{});
-    decVideo('vid-credits', 6);
-  }catch(e){ showErr('action-err','Network error — please try again.'); }
-  finally{ setBtnLoading('action-btn', false, 'action-shimmer'); stopProgress('action'); }
+    const res=await fetch('/studios/percfectcharacter/generate-spin',{method:'POST',body:fd});
+    const data=await res.json();
+    if(!res.ok){ err(errId,data.error||'Generation failed.'); return; }
+    const v=document.getElementById(vidId); v.src=data.url; show(outId); v.play().catch(()=>{});
+    adjCredit('vid-credits',-6); loadRoster();
+  }catch(e){ err(errId,'Network error — please try again.'); }
+  finally{ setBtn(btnId,false); stopProgress(prefix); }
 }
+function startProgress(p){ let el=0; const MAX=120; show(p+'-wrap'); document.getElementById(p+'-bar').style.width='0%'; document.getElementById(p+'-elapsed').textContent='0'; spinTimer=setInterval(()=>{ el++; document.getElementById(p+'-elapsed').textContent=el; document.getElementById(p+'-bar').style.width=Math.min(95,(el/MAX)*100)+'%'; },1000); }
+function stopProgress(p){ if(spinTimer){clearInterval(spinTimer);spinTimer=null;} const b=document.getElementById(p+'-bar'); if(b)b.style.width='100%'; setTimeout(()=>hide(p+'-wrap'),400); }
+
+/* ── Reset ── */
+function resetBuilder(){
+  state.shots=[]; state.primary=null; state.savedId=null; state.file=null;
+  document.getElementById('desc').value=''; document.getElementById('char-name').value='';
+  const p=document.getElementById('drop-preview'); p.src=''; p.style.display='none';
+  document.getElementById('drop-label').textContent='Drop a photo here or click to upload';
+  document.getElementById('drop').classList.remove('has-image');
+  hide('shots-section'); hide('post-save');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ── Roster ── */
+async function loadRoster(){
+  if(!(LOGGED_IN||window.LOGGED_IN)) return;
+  try{
+    const res=await fetch('/studios/percfectcharacter/characters');
+    const data=await res.json();
+    canDownload=data.can_download;
+    const grid=document.getElementById('roster-grid');
+    if(!data.characters.length){ show('roster-empty'); grid.innerHTML=''; return; }
+    hide('roster-empty');
+    grid.innerHTML=data.characters.map(c=>{
+      const dl = canDownload
+        ? `<a class="rbtn" href="/studios/percfectcharacter/download/${c.id}">↓ Download</a>`
+        : `<a class="rbtn locked" href="/buy-credits" title="Buy credits to unlock">🔒 Download</a>`;
+      const spin = c.spin_video_url ? '<span class="rchar-badge">360°</span>' : '';
+      return `<div class="rchar">
+        <div class="rchar-img"><img src="${c.primary_image_url}" alt="">${spin}</div>
+        <div class="rchar-body">
+          <div class="rchar-name">${escapeHtml(c.name||'Unnamed')}</div>
+          <div class="rchar-meta">${c.gender||''}${c.spin_video_url?' · has spin':''}</div>
+          <div class="rchar-actions">
+            <button class="rbtn" onclick='openEdit(${JSON.stringify(c)})'>✎ Edit</button>
+            ${dl}
+            <button class="rbtn danger" onclick="deleteChar(${c.id})">🗑</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){}
+}
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+async function deleteChar(id){
+  if(!confirm('Delete this character?')) return;
+  const fd=new FormData(); fd.append('character_id',id);
+  await fetch('/studios/percfectcharacter/delete',{method:'POST',body:fd});
+  loadRoster();
+}
+
+/* ── Edit ── */
+function openEdit(c){
+  document.getElementById('edit-id').value=c.id;
+  document.getElementById('edit-name').value=c.name||'';
+  document.getElementById('edit-adjust').value='';
+  hide('edit-err');
+  setEditGender(c.gender==='female'?'female':(c.gender==='male'?'male':null));
+  new bootstrap.Modal(document.getElementById('editModal')).show();
+}
+function setEditGender(g){ editGender=g; document.getElementById('edit-gender-male').classList.toggle('active',g==='male'); document.getElementById('edit-gender-female').classList.toggle('active',g==='female'); }
+async function saveEdit(){
+  const id=document.getElementById('edit-id').value;
+  const fd=new FormData(); fd.append('character_id',id);
+  fd.append('name',document.getElementById('edit-name').value.trim());
+  if(editGender) fd.append('gender',editGender);
+  const adj=document.getElementById('edit-adjust').value.trim();
+  if(adj) fd.append('adjust',adj);
+  hide('edit-err'); setBtn('edit-save-btn',true);
+  try{
+    const res=await fetch('/studios/percfectcharacter/edit',{method:'POST',body:fd});
+    const data=await res.json();
+    if(!res.ok){ err('edit-err',data.error||'Save failed.'); return; }
+    if(adj) adjCredit('img-credits',-1);
+    bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+    loadRoster();
+  }catch(e){ err('edit-err','Network error — please try again.'); }
+  finally{ setBtn('edit-save-btn',false); }
+}
+
+loadRoster();
 </script>
 {% endblock %}

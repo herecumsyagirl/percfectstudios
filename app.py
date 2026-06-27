@@ -126,6 +126,29 @@ def character_action_prompt(action_key: str) -> str:
     return _ACTION_BASE.format(action=act["action"])
 
 
+def _gender_word(gender: str) -> str:
+    g = (gender or "").strip().lower()
+    if g in ("male", "m", "man", "boy"):
+        return "male"
+    if g in ("female", "f", "woman", "girl"):
+        return "female"
+    return ""
+
+
+def build_character_prompt(description: str, gender: str, has_image: bool) -> str:
+    """Compose the image prompt from gender + (description | uploaded photo)."""
+    g = _gender_word(gender)
+    if has_image:
+        prompt = CHARACTER_IMAGE_PROMPT
+        if g:
+            prompt += f" The character is {g}."
+        return prompt
+    base = description.strip()
+    if g:
+        base = f"{base}, a {g} character"
+    return base + CHARACTER_TEXT_SUFFIX
+
+
 def _load_image_any(url: str) -> Image.Image:
     """Load an image from a data: URI or an http(s) URL into a PIL image."""
     if url.startswith("data:"):
@@ -138,20 +161,24 @@ def _load_image_any(url: str) -> Image.Image:
     return Image.open(BytesIO(raw)).convert("RGB")
 
 
-def composite_two_characters(url_a: str, url_b: str) -> str:
-    """Place two approved character images side-by-side on a white frame and return a data URI.
+def composite_characters(urls: list) -> str:
+    """Place N approved character images side-by-side on a white frame and return a data URI.
 
-    The video generator only accepts one source image, so the two characters must share a
+    The video generator only accepts one source image, so multiple characters must share a
     single frame before they can be animated together.
     """
     target_h = 768
     frames = []
-    for u in (url_a, url_b):
+    for u in urls:
+        if not u:
+            continue
         im = _load_image_any(u)
         w = max(1, int(im.width * target_h / im.height))
         frames.append(im.resize((w, target_h)))
+    if not frames:
+        raise ValueError("No images to composite.")
     gap = 24
-    total_w = sum(f.width for f in frames) + gap
+    total_w = sum(f.width for f in frames) + gap * (len(frames) - 1)
     canvas = Image.new("RGB", (total_w, target_h), (255, 255, 255))
     x = 0
     for f in frames:
@@ -160,6 +187,38 @@ def composite_two_characters(url_a: str, url_b: str) -> str:
     buf = BytesIO()
     canvas.save(buf, format="JPEG", quality=90)
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+def composite_two_characters(url_a: str, url_b: str) -> str:
+    return composite_characters([url_a, url_b])
+
+
+def generate_character_shots(prompt: str, image_url: str = None, count: int = 4) -> list:
+    """Generate `count` character shots. Text mode tries a single n=count call and falls
+    back to looping; upload (edit) mode loops since edits don't reliably honor n."""
+    urls = []
+    if image_url:
+        for _ in range(count):
+            try:
+                r = generate_image_xai(prompt, image_url)
+                urls.append(r["data"][0]["url"])
+            except Exception:
+                break
+    else:
+        try:
+            r = generate_image_xai(prompt, None, n=count)
+            urls = [d["url"] for d in (r.get("data") or []) if d.get("url")]
+        except Exception:
+            urls = []
+        while len(urls) < count:
+            try:
+                r2 = generate_image_xai(prompt, None, n=1)
+                urls.append(r2["data"][0]["url"])
+            except Exception:
+                break
+    if not urls:
+        raise Exception("Image generation returned no shots.")
+    return urls[:count]
 
 
 # Credit packages: price_id -> (image_credits, video_credits)
@@ -234,7 +293,7 @@ def _get_form_image_url():
     return image_url
 
 
-def generate_image_xai(prompt: str, image_url: str = None) -> dict:
+def generate_image_xai(prompt: str, image_url: str = None, n: int = 1) -> dict:
     headers = {
         "Authorization": f"Bearer {XAI_API_KEY}",
         "Content-Type": "application/json"
@@ -250,7 +309,7 @@ def generate_image_xai(prompt: str, image_url: str = None) -> dict:
         payload = {
             "model": "grok-imagine-image",
             "prompt": prompt,
-            "n": 1,
+            "n": n,
         }
         endpoint = f"{XAI_BASE_URL}/images/generations"
     resp = requests.post(endpoint, json=payload, headers=headers, timeout=90)
@@ -340,8 +399,8 @@ def _do_register(username, password, birthday="", ip=None, email=None):
         "email": email,
         "password": hashed,
         "birthday": birthday or None,
-        "picture_credits": 10,
-        "video_credits": 6,
+        "picture_credits": 0,
+        "video_credits": 0,
         "signup_ip": ip,
         "images_today": 0,
         "videos_today": 0,
@@ -1105,6 +1164,7 @@ def payment_success():
             supabase.table("users").update({
                 "picture_credits": res.data["picture_credits"] + pkg["image_credits"],
                 "video_credits": res.data["video_credits"] + pkg["video_credits"],
+                "has_purchased": True,
             }).eq("id", current_user.id).execute()
             flash(f"Payment successful! Added {pkg['image_credits']} image credits"
                   + (f" and {pkg['video_credits']} video credits" if pkg["video_credits"] else "") + ".", "success")
@@ -1134,6 +1194,7 @@ def stripe_webhook():
                     supabase.table("users").update({
                         "picture_credits": res.data["picture_credits"] + pkg["image_credits"],
                         "video_credits": res.data["video_credits"] + pkg["video_credits"],
+                        "has_purchased": True,
                     }).eq("id", user_id).execute()
 
     return "", 200
@@ -1500,61 +1561,112 @@ def princess_generate():
 
 
 # ── Percfect Characters ───────────────────────────────────
+def _load_bytes(url: str) -> bytes:
+    if url.startswith("data:"):
+        return base64.b64decode(url.split(",", 1)[1])
+    r = requests.get(url, timeout=60)
+    r.raise_for_status()
+    return r.content
+
+
+def _user_has_purchased(user_id) -> bool:
+    try:
+        res = supabase.table("users").select("has_purchased,is_admin").eq("id", user_id).single().execute()
+        d = res.data or {}
+        return bool(d.get("is_admin")) or bool(d.get("has_purchased"))
+    except Exception:
+        return False
+
+
+def _serialize_character(c: dict) -> dict:
+    return {
+        "id": c.get("id"),
+        "name": c.get("name"),
+        "gender": c.get("gender"),
+        "images": c.get("images") or [],
+        "primary_image_url": c.get("primary_image_url"),
+        "spin_video_url": c.get("spin_video_url"),
+    }
+
+
 @app.route("/studios/percfectcharacter")
 def percfect_character():
     user_data = None
     if current_user.is_authenticated:
         reset_daily_if_needed(current_user.id)
         res = supabase.table("users").select(
-            "picture_credits,video_credits,images_today,videos_today"
+            "picture_credits,video_credits,images_today,videos_today,has_purchased"
         ).eq("id", current_user.id).single().execute()
         user_data = res.data
-    return render_template(
-        "percfect_character.html",
-        user=user_data,
-        actions=CHARACTER_ACTIONS,
-    )
+    return render_template("percfect_character.html", user=user_data)
 
 
-@app.route("/studios/percfectcharacter/generate-image", methods=["POST"])
+@app.route("/studios/percfectcharacter/generate-shots", methods=["POST"])
 @login_required
-def character_generate_image():
+def character_generate_shots():
     reset_daily_if_needed(current_user.id)
     res = supabase.table("users").select("picture_credits,images_today").eq("id", current_user.id).single().execute()
     user_data = res.data
 
-    if not current_user.is_admin and user_data["picture_credits"] <= 0:
-        return jsonify({"error": "No image credits remaining."}), 402
+    cost = 4
+    if not current_user.is_admin and user_data["picture_credits"] < cost:
+        return jsonify({"error": f"You need {cost} image credits. Buy credits or redeem a coupon code."}), 402
 
     source_image = _get_form_image_url()
     description = request.form.get("description", "").strip()
+    gender = request.form.get("gender", "").strip()
 
-    if source_image:
-        full_prompt = CHARACTER_IMAGE_PROMPT
-    elif description:
-        full_prompt = description + CHARACTER_TEXT_SUFFIX
-    else:
-        return jsonify({"error": "Upload an image or describe your character."}), 400
+    if not source_image and not description:
+        return jsonify({"error": "Upload a photo or describe your character."}), 400
+
+    full_prompt = build_character_prompt(description, gender, bool(source_image))
 
     try:
-        result = generate_image_xai(full_prompt, source_image)
-        image_url = result["data"][0]["url"]
+        urls = generate_character_shots(full_prompt, source_image, count=cost)
 
         if not current_user.is_admin:
+            spent = len(urls)
             supabase.table("users").update({
-                "picture_credits": user_data["picture_credits"] - 1,
-                "images_today": user_data["images_today"] + 1,
+                "picture_credits": max(0, user_data["picture_credits"] - spent),
+                "images_today": user_data["images_today"] + spent,
             }).eq("id", current_user.id).execute()
 
-        supabase.table("generations").insert({
-            "user_id": current_user.id,
-            "type": "image",
-            "prompt": full_prompt,
-            "output_url": image_url,
-            "created_at": datetime.datetime.utcnow().isoformat(),
-        }).execute()
+        return jsonify({"urls": urls, "prompt": full_prompt})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-        return jsonify({"url": image_url})
+
+@app.route("/studios/percfectcharacter/save", methods=["POST"])
+@login_required
+def character_save():
+    import json
+    name = (request.form.get("name", "").strip() or "Unnamed Character")[:80]
+    gender = request.form.get("gender", "").strip()
+    prompt = request.form.get("prompt", "").strip()
+    source_mode = request.form.get("source_mode", "describe").strip()
+    primary = request.form.get("primary_image_url", "").strip()
+    try:
+        images = json.loads(request.form.get("images", "[]"))
+        if not isinstance(images, list):
+            images = []
+    except Exception:
+        images = []
+    if not primary and images:
+        primary = images[0]
+    if not primary:
+        return jsonify({"error": "No character image to save."}), 400
+
+    try:
+        row = supabase.table("characters").insert({
+            "user_id": current_user.id,
+            "name": name,
+            "gender": gender,
+            "images": images,
+            "primary_image_url": primary,
+            "prompt": prompt,
+            "source_mode": source_mode,
+        }).execute()
+        return jsonify({"ok": True, "character": _serialize_character(row.data[0])})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1566,13 +1678,18 @@ def character_generate_spin():
     res = supabase.table("users").select("video_credits,videos_today").eq("id", current_user.id).single().execute()
     user_data = res.data
 
-    image_url = request.form.get("image_url", "").strip()
+    char_id = request.form.get("character_id", "").strip()
+    cres = supabase.table("characters").select("*").eq("id", char_id).eq("user_id", current_user.id).maybe_single().execute()
+    char = cres.data if cres else None
+    if not char:
+        return jsonify({"error": "Character not found."}), 404
+    image_url = char.get("primary_image_url")
     if not image_url:
-        return jsonify({"error": "Approve a character image first."}), 400
+        return jsonify({"error": "This character has no image."}), 400
 
     duration = 6
     if not current_user.is_admin and user_data["video_credits"] < duration:
-        return jsonify({"error": f"Not enough video seconds. You have {user_data['video_credits']}s remaining."}), 402
+        return jsonify({"error": f"Not enough video seconds. Buy credits or redeem a coupon code."}), 402
 
     try:
         result = generate_video_xai(CHARACTER_SPIN_PROMPT, image_url, duration)
@@ -1586,11 +1703,14 @@ def character_generate_spin():
                 "videos_today": user_data["videos_today"] + 1,
             }).eq("id", current_user.id).execute()
 
+        supabase.table("characters").update({
+            "spin_video_url": video_url,
+            "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        }).eq("id", char_id).execute()
+
         supabase.table("generations").insert({
-            "user_id": current_user.id,
-            "type": "video",
-            "prompt": CHARACTER_SPIN_PROMPT,
-            "output_url": video_url,
+            "user_id": current_user.id, "type": "video",
+            "prompt": CHARACTER_SPIN_PROMPT, "output_url": video_url,
             "created_at": datetime.datetime.utcnow().isoformat(),
         }).execute()
 
@@ -1599,30 +1719,146 @@ def character_generate_spin():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/studios/percfectcharacter/generate-action", methods=["POST"])
+@app.route("/studios/percfectcharacter/edit", methods=["POST"])
 @login_required
-def character_generate_action():
+def character_edit():
+    char_id = request.form.get("character_id", "").strip()
+    cres = supabase.table("characters").select("*").eq("id", char_id).eq("user_id", current_user.id).maybe_single().execute()
+    char = cres.data if cres else None
+    if not char:
+        return jsonify({"error": "Character not found."}), 404
+
+    updates = {}
+    name = request.form.get("name", "").strip()
+    gender = request.form.get("gender", "").strip()
+    adjust = request.form.get("adjust", "").strip()
+    if name:
+        updates["name"] = name[:80]
+    if gender:
+        updates["gender"] = gender
+
+    if adjust:
+        # Re-generate the primary image with an edit prompt (costs 1 image credit)
+        reset_daily_if_needed(current_user.id)
+        ures = supabase.table("users").select("picture_credits,images_today").eq("id", current_user.id).single().execute()
+        u = ures.data
+        if not current_user.is_admin and u["picture_credits"] < 1:
+            return jsonify({"error": "You need 1 image credit to adjust the picture."}), 402
+        try:
+            r = generate_image_xai(adjust, char.get("primary_image_url"))
+            new_url = r["data"][0]["url"]
+            updates["primary_image_url"] = new_url
+            imgs = char.get("images") or []
+            updates["images"] = [new_url] + [i for i in imgs if i != char.get("primary_image_url")]
+            if not current_user.is_admin:
+                supabase.table("users").update({
+                    "picture_credits": max(0, u["picture_credits"] - 1),
+                    "images_today": u["images_today"] + 1,
+                }).eq("id", current_user.id).execute()
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    if not updates:
+        return jsonify({"error": "Nothing to update."}), 400
+
+    updates["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    row = supabase.table("characters").update(updates).eq("id", char_id).execute()
+    return jsonify({"ok": True, "character": _serialize_character(row.data[0])})
+
+
+@app.route("/studios/percfectcharacter/characters")
+@login_required
+def character_list():
+    res = supabase.table("characters").select("*").eq("user_id", current_user.id).order("created_at", desc=True).execute()
+    chars = [_serialize_character(c) for c in (res.data or [])]
+    return jsonify({"characters": chars, "can_download": _user_has_purchased(current_user.id)})
+
+
+@app.route("/studios/percfectcharacter/delete", methods=["POST"])
+@login_required
+def character_delete():
+    char_id = request.form.get("character_id", "").strip()
+    supabase.table("characters").delete().eq("id", char_id).eq("user_id", current_user.id).execute()
+    return jsonify({"ok": True})
+
+
+@app.route("/studios/percfectcharacter/download/<int:char_id>")
+@login_required
+def character_download(char_id):
+    import zipfile, re
+    cres = supabase.table("characters").select("*").eq("id", char_id).eq("user_id", current_user.id).maybe_single().execute()
+    char = cres.data if cres else None
+    if not char:
+        return jsonify({"error": "Character not found."}), 404
+    if not _user_has_purchased(current_user.id):
+        return jsonify({"error": "Buy credits to unlock downloading your character pack."}), 402
+
+    name = (char.get("name") or "character").strip() or "character"
+    safe = re.sub(r"[^A-Za-z0-9 _-]", "", name).strip().replace(" ", "_") or "character"
+    images = char.get("images") or []
+
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr(f"{safe}/info.txt",
+                   f"Name: {name}\nGender: {char.get('gender','')}\nPrompt: {char.get('prompt','')}\n")
+        for i, url in enumerate(images, 1):
+            try:
+                z.writestr(f"{safe}/shot{i}.jpg", _load_bytes(url))
+            except Exception:
+                pass
+        spin = char.get("spin_video_url")
+        if spin:
+            try:
+                z.writestr(f"{safe}/{safe}_360.mp4", _load_bytes(spin))
+            except Exception:
+                pass
+    buf.seek(0)
+    return Response(buf.getvalue(), mimetype="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{safe}.zip"'})
+
+
+@app.route("/studios/percfectcharacter/arena")
+def percfect_arena():
+    user_data = None
+    if current_user.is_authenticated:
+        reset_daily_if_needed(current_user.id)
+        res = supabase.table("users").select(
+            "picture_credits,video_credits,has_purchased"
+        ).eq("id", current_user.id).single().execute()
+        user_data = res.data
+    return render_template("percfect_arena.html", user=user_data, actions=CHARACTER_ACTIONS)
+
+
+@app.route("/studios/percfectcharacter/arena/generate", methods=["POST"])
+@login_required
+def arena_generate():
     reset_daily_if_needed(current_user.id)
     res = supabase.table("users").select("video_credits,videos_today").eq("id", current_user.id).single().execute()
     user_data = res.data
 
-    image_a = request.form.get("image_a", "").strip()
-    image_b = request.form.get("image_b", "").strip()
+    ids = [i.strip() for i in request.form.get("character_ids", "").split(",") if i.strip()]
     action = request.form.get("action", "")
-
-    if not image_a or not image_b:
-        return jsonify({"error": "Approve both characters first."}), 400
+    if len(ids) < 2:
+        return jsonify({"error": "Pick at least 2 characters."}), 400
+    if len(ids) > 3:
+        return jsonify({"error": "The Arena supports up to 3 characters."}), 400
 
     prompt = character_action_prompt(action)
     if not prompt:
-        return jsonify({"error": "Pick an action."}), 400
+        return jsonify({"error": "Pick an interaction."}), 400
 
-    duration = 6
+    duration = 12 if len(ids) == 3 else 6
     if not current_user.is_admin and user_data["video_credits"] < duration:
-        return jsonify({"error": f"Not enough video seconds. You have {user_data['video_credits']}s remaining."}), 402
+        return jsonify({"error": f"This needs {duration} video seconds. Buy credits or redeem a coupon code."}), 402
+
+    cres = supabase.table("characters").select("*").in_("id", ids).eq("user_id", current_user.id).execute()
+    rows = {str(c["id"]): c for c in (cres.data or [])}
+    primaries = [rows[i]["primary_image_url"] for i in ids if i in rows and rows[i].get("primary_image_url")]
+    if len(primaries) != len(ids):
+        return jsonify({"error": "One or more characters could not be loaded."}), 400
 
     try:
-        composite = composite_two_characters(image_a, image_b)
+        composite = composite_characters(primaries)
         result = generate_video_xai(prompt, composite, duration)
         video_url = (result.get("video") or {}).get("url") \
             or result.get("url") \
@@ -1635,10 +1871,8 @@ def character_generate_action():
             }).eq("id", current_user.id).execute()
 
         supabase.table("generations").insert({
-            "user_id": current_user.id,
-            "type": "video",
-            "prompt": prompt,
-            "output_url": video_url,
+            "user_id": current_user.id, "type": "video",
+            "prompt": prompt, "output_url": video_url,
             "created_at": datetime.datetime.utcnow().isoformat(),
         }).execute()
 
