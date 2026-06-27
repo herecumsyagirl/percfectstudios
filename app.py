@@ -1601,72 +1601,99 @@ def percfect_character():
     return render_template("percfect_character.html", user=user_data)
 
 
-@app.route("/studios/percfectcharacter/generate-shots", methods=["POST"])
+@app.route("/studios/percfectcharacter/generate-one", methods=["POST"])
 @login_required
-def character_generate_shots():
+def character_generate_one():
+    """Step 1: generate a SINGLE shot for the user to approve (1 image credit)."""
     reset_daily_if_needed(current_user.id)
     res = supabase.table("users").select("picture_credits,images_today").eq("id", current_user.id).single().execute()
-    user_data = res.data
+    u = res.data
 
-    cost = 4
-    if not current_user.is_admin and user_data["picture_credits"] < cost:
-        return jsonify({"error": f"You need {cost} image credits. Buy credits or redeem a coupon code."}), 402
+    if not current_user.is_admin and u["picture_credits"] < 1:
+        return jsonify({"error": "You need 1 image credit. Buy credits or redeem a coupon code."}), 402
 
     source_image = _get_form_image_url()
     description = request.form.get("description", "").strip()
     gender = request.form.get("gender", "").strip()
-
     if not source_image and not description:
         return jsonify({"error": "Upload a photo or describe your character."}), 400
 
-    full_prompt = build_character_prompt(description, gender, bool(source_image))
-
+    prompt = build_character_prompt(description, gender, bool(source_image))
     try:
-        urls = generate_character_shots(full_prompt, source_image, count=cost)
-
+        r = generate_image_xai(prompt, source_image)
+        url = r["data"][0]["url"]
         if not current_user.is_admin:
-            spent = len(urls)
             supabase.table("users").update({
-                "picture_credits": max(0, user_data["picture_credits"] - spent),
-                "images_today": user_data["images_today"] + spent,
+                "picture_credits": max(0, u["picture_credits"] - 1),
+                "images_today": u["images_today"] + 1,
             }).eq("id", current_user.id).execute()
-
-        return jsonify({"urls": urls, "prompt": full_prompt})
+        return jsonify({"url": url, "prompt": prompt})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/studios/percfectcharacter/save", methods=["POST"])
+@app.route("/studios/percfectcharacter/finalize", methods=["POST"])
 @login_required
-def character_save():
-    import json
-    name = (request.form.get("name", "").strip() or "Unnamed Character")[:80]
-    gender = request.form.get("gender", "").strip()
-    prompt = request.form.get("prompt", "").strip()
-    source_mode = request.form.get("source_mode", "describe").strip()
+def character_finalize():
+    """Step 2 (after approval): generate the other 3 shots + 360 spin, then save the
+    character to the roster. Costs 3 image credits + 6 video seconds."""
+    reset_daily_if_needed(current_user.id)
+    res = supabase.table("users").select(
+        "picture_credits,video_credits,images_today,videos_today"
+    ).eq("id", current_user.id).single().execute()
+    u = res.data
+
     primary = request.form.get("primary_image_url", "").strip()
-    try:
-        images = json.loads(request.form.get("images", "[]"))
-        if not isinstance(images, list):
-            images = []
-    except Exception:
-        images = []
-    if not primary and images:
-        primary = images[0]
+    prompt = request.form.get("prompt", "").strip()
+    gender = request.form.get("gender", "").strip()
+    name = (request.form.get("name", "").strip() or "Unnamed Character")[:80]
+    source_mode = request.form.get("source_mode", "describe").strip()
     if not primary:
-        return jsonify({"error": "No character image to save."}), 400
+        return jsonify({"error": "Approve a shot first."}), 400
+
+    extra_n, vid_dur = 3, 6
+    if not current_user.is_admin and (u["picture_credits"] < extra_n or u["video_credits"] < vid_dur):
+        return jsonify({"error": f"You need {extra_n} image credits + {vid_dur} video seconds to build the full character. Buy credits or redeem a coupon code."}), 402
 
     try:
+        # 3 more shots — image-edits of the approved shot so they stay consistent
+        images = [primary]
+        edit_prompt = prompt or CHARACTER_IMAGE_PROMPT
+        for _ in range(extra_n):
+            try:
+                rr = generate_image_xai(edit_prompt, primary)
+                images.append(rr["data"][0]["url"])
+            except Exception:
+                pass
+
+        # 360 spin from the approved shot
+        sv = generate_video_xai(CHARACTER_SPIN_PROMPT, primary, vid_dur)
+        spin_url = (sv.get("video") or {}).get("url") \
+            or sv.get("url") or (sv.get("data") or [{}])[0].get("url")
+
+        if not current_user.is_admin:
+            spent_img = len(images) - 1
+            supabase.table("users").update({
+                "picture_credits": max(0, u["picture_credits"] - spent_img),
+                "video_credits": max(0, u["video_credits"] - vid_dur),
+                "images_today": u["images_today"] + spent_img,
+                "videos_today": u["videos_today"] + 1,
+            }).eq("id", current_user.id).execute()
+
         row = supabase.table("characters").insert({
-            "user_id": current_user.id,
-            "name": name,
-            "gender": gender,
-            "images": images,
-            "primary_image_url": primary,
-            "prompt": prompt,
-            "source_mode": source_mode,
+            "user_id": current_user.id, "name": name, "gender": gender,
+            "images": images, "primary_image_url": primary,
+            "spin_video_url": spin_url, "prompt": prompt, "source_mode": source_mode,
         }).execute()
-        return jsonify({"ok": True, "character": _serialize_character(row.data[0])})
+
+        supabase.table("generations").insert({
+            "user_id": current_user.id, "type": "video",
+            "prompt": CHARACTER_SPIN_PROMPT, "output_url": spin_url,
+            "created_at": datetime.datetime.utcnow().isoformat(),
+        }).execute()
+
+        return jsonify({"ok": True, "character": _serialize_character(row.data[0]),
+                        "images": images, "spin_url": spin_url})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
