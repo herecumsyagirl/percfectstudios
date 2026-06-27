@@ -1,0 +1,480 @@
+{% extends "base.html" %}
+{% block title %}Percfect Characters · Build, Spin & Animate AI Characters{% endblock %}
+
+{% block content %}
+
+<!-- ── Hero ─────────────────────────────────────────────── -->
+<div class="studio-hero char-hero">
+  <div class="container">
+    <div class="hero-badge"><span class="badge-dot"></span>&nbsp;Two characters · 360° spin · action scenes</div>
+    <h1>Percfect <span class="hero-grad">Characters</span></h1>
+    <p class="hero-sub">Build two characters from a photo or a description, spin them in 360°, then pick an action and watch them come to life together.</p>
+
+    <div class="hero-credits">
+      {% if user %}
+        <span class="credit-badge"><span class="dot"></span><span id="img-credits">{{ user.picture_credits }}</span> image credits</span>
+        <span class="credit-badge"><span class="dot" style="background:var(--accent-3)"></span><span id="vid-credits">{{ user.video_credits }}</span> video credits</span>
+        <a href="/buy-credits" class="btn-accent" style="padding:.45rem 1.2rem;font-size:.85rem;">+ Buy credits</a>
+      {% else %}
+        <span class="credit-badge free-badge"><span class="badge-dot pulse"></span>Sign up free to start building</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ── Character builders ─────────────────────────────────── -->
+<div class="container mb-5">
+  <div class="row g-4">
+
+    {% for i in [1, 2] %}
+    <div class="col-lg-6">
+      <div class="studio-panel char-card" id="card-{{ i }}">
+        <div class="char-head">
+          <span class="char-num">{{ i }}</span>
+          <span class="char-title">{{ 'Character One' if i == 1 else 'Character Two' }}</span>
+          <span class="char-status" id="status-{{ i }}">Not started</span>
+        </div>
+
+        <!-- Mode toggle -->
+        <div class="mode-toggle">
+          <button class="mode-btn active" id="mode-describe-{{ i }}" onclick="setMode({{ i }},'describe')">✍️ Describe</button>
+          <button class="mode-btn" id="mode-upload-{{ i }}" onclick="setMode({{ i }},'upload')">🖼 Upload photo</button>
+        </div>
+
+        <!-- Describe pane -->
+        <div class="mode-pane" id="describe-pane-{{ i }}">
+          <label class="form-label">Describe your character</label>
+          <textarea class="form-control" id="desc-{{ i }}" rows="3"
+            placeholder="A brave young knight with silver armor, short brown hair, a red cape and a kind smile…"></textarea>
+        </div>
+
+        <!-- Upload pane -->
+        <div class="mode-pane" id="upload-pane-{{ i }}" style="display:none">
+          <label class="form-label">Upload a reference photo</label>
+          <div class="drop-zone" id="drop-{{ i }}" onclick="document.getElementById('file-{{ i }}').click()">
+            <span id="drop-label-{{ i }}">Drop a photo here or click to upload</span>
+            <img id="drop-preview-{{ i }}" src="" alt="" style="display:none;max-height:90px;border-radius:8px;margin-top:.5rem;" />
+          </div>
+          <input type="file" id="file-{{ i }}" accept="image/*" style="display:none" onchange="handleFile({{ i }}, this)" />
+        </div>
+
+        <button class="generate-btn" id="gen-btn-{{ i }}" onclick="generateCharacter({{ i }})">
+          <span class="btn-text">✦ Generate character</span>
+          <span class="btn-spinner" style="display:none">Generating…</span>
+        </button>
+        <p class="credit-note">1 image credit</p>
+
+        <div class="output-area" id="out-{{ i }}">
+          <div class="output-placeholder" id="ph-{{ i }}">
+            <div class="placeholder-grid">
+              <div class="ph-tile" style="background:linear-gradient(135deg,#1a0a3e,#3d1a6e)"></div>
+              <div class="ph-tile" style="background:linear-gradient(135deg,#0a1a2e,#1a3d6e)"></div>
+              <div class="ph-tile" style="background:linear-gradient(135deg,#1a2e0a,#3d6e1a)"></div>
+              <div class="ph-tile" style="background:linear-gradient(135deg,#2e0a1a,#6e1a3d)"></div>
+            </div>
+            <p class="ph-text">Your character will appear here</p>
+          </div>
+          <div class="shimmer-overlay" id="shimmer-{{ i }}"></div>
+          <img id="img-{{ i }}" src="" alt="" />
+        </div>
+        <div id="img-err-{{ i }}" class="gen-error" style="display:none"></div>
+
+        <!-- Review -->
+        <div class="review-row" id="review-{{ i }}" style="display:none">
+          <button class="btn-accent" onclick="approveCharacter({{ i }})">✓ Approve character</button>
+          <button class="btn-outline-accent" onclick="generateCharacter({{ i }})">↻ Regenerate</button>
+        </div>
+
+        <!-- Spin -->
+        <div class="spin-sec" id="spin-sec-{{ i }}" style="display:none">
+          <div class="approved-pill">✓ Character approved</div>
+          <button class="generate-btn generate-btn-video" id="spin-btn-{{ i }}" onclick="generateSpin({{ i }})">
+            <span class="btn-text">🎥 Create 360° spin</span>
+            <span class="btn-spinner" style="display:none">Generating… (~60s)</span>
+          </button>
+          <p class="credit-note">6 video seconds · optional</p>
+
+          <div class="progress-wrap" id="spin{{ i }}-wrap" style="display:none">
+            <div class="progress-top">
+              <span>Spinning your character…</span>
+              <span class="progress-time"><span id="spin{{ i }}-elapsed">0</span>s</span>
+            </div>
+            <div class="progress-track"><div class="progress-bar" id="spin{{ i }}-bar"></div></div>
+            <div class="progress-hint">Usually 60–120 seconds · do not refresh</div>
+          </div>
+
+          <div class="output-area spin-out" id="spin-out-{{ i }}" style="display:none;min-height:auto;margin-top:.75rem;">
+            <video id="spin-vid-{{ i }}" controls loop muted playsinline></video>
+          </div>
+          <div id="spin-err-{{ i }}" class="gen-error" style="display:none"></div>
+        </div>
+
+      </div>
+    </div>
+    {% endfor %}
+
+  </div>
+</div>
+
+<!-- ── Action scene ──────────────────────────────────────── -->
+<div class="container mb-6">
+  <div class="studio-panel action-section">
+    <div class="panel-label">🎬&nbsp; Bring them together</div>
+
+    <div class="action-lock" id="action-lock">
+      <span class="lock-icon">🔒</span>
+      <p>Approve <strong>both</strong> characters above to unlock action scenes.</p>
+    </div>
+
+    <div class="action-body" id="action-body" style="display:none">
+      <p class="section-label">Choose an action</p>
+      <div class="action-grid">
+        {% for key, a in actions.items() %}
+        <button class="action-chip" id="action-chip-{{ key }}" onclick="selectAction('{{ key }}')">
+          <span class="action-emoji">{{ a.emoji }}</span>
+          <span>{{ a.label }}</span>
+        </button>
+        {% endfor %}
+      </div>
+
+      <button class="generate-btn generate-btn-video mt-3" id="action-btn" onclick="generateAction()" disabled>
+        <span class="btn-text">▶ Generate action video</span>
+        <span class="btn-spinner" style="display:none">Generating… (~90s)</span>
+      </button>
+      <p class="credit-note">6 video seconds</p>
+
+      <div class="progress-wrap" id="action-wrap" style="display:none">
+        <div class="progress-top">
+          <span>Creating your scene…</span>
+          <span class="progress-time"><span id="action-elapsed">0</span>s</span>
+        </div>
+        <div class="progress-track"><div class="progress-bar" id="action-bar"></div></div>
+        <div class="progress-hint">Usually 60–120 seconds · do not refresh</div>
+      </div>
+
+      <div class="output-area" id="action-out">
+        <div class="output-placeholder" id="action-ph">
+          <div class="placeholder-grid">
+            <div class="ph-tile" style="background:linear-gradient(135deg,#0a2e2e,#1a6e6e)"></div>
+            <div class="ph-tile" style="background:linear-gradient(135deg,#2e1a0a,#6e4e1a)"></div>
+            <div class="ph-tile" style="background:linear-gradient(135deg,#1a0a2e,#4e1a6e)"></div>
+            <div class="ph-tile" style="background:linear-gradient(135deg,#0a2e0a,#1a6e3d)"></div>
+          </div>
+          <p class="ph-text">Your action scene will appear here</p>
+        </div>
+        <div class="shimmer-overlay" id="action-shimmer"></div>
+        <video id="action-vid" controls loop playsinline></video>
+      </div>
+
+      <div class="output-actions" id="action-actions" style="display:none">
+        <a id="action-dl" href="#" download="percfect-characters.mp4" class="btn-outline-accent btn-sm">↓ Download</a>
+        <button type="button" class="btn-share-x btn-sm" onclick="shareToX(document.getElementById('action-vid').src,'video','Percfect Characters action scene')">𝕏 Post to X</button>
+      </div>
+      <div id="action-err" class="gen-error" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+.char-hero { padding: 3.5rem 1rem 2rem; position: relative; text-align: center; }
+.char-hero::before {
+  content:''; position:absolute; top:-10%; left:50%; transform:translateX(-50%);
+  width:700px; height:700px; border-radius:50%;
+  background:radial-gradient(circle,rgba(124,92,252,.14) 0%,transparent 65%); pointer-events:none;
+}
+.hero-badge {
+  display:inline-flex; align-items:center; gap:.4rem;
+  background:rgba(124,92,252,.1); border:1px solid rgba(124,92,252,.25);
+  border-radius:99px; padding:.3rem 1rem; margin-bottom:1.25rem;
+  font-family:var(--font-mono); font-size:.72rem; color:var(--accent-3); letter-spacing:.06em;
+}
+.badge-dot { width:6px; height:6px; border-radius:50%; background:var(--accent-2); display:inline-block; }
+.badge-dot.pulse { animation:pulse 2s ease-in-out infinite; }
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.85)}}
+.char-hero h1 { font-size:clamp(2.2rem,6vw,3.6rem); font-weight:900; letter-spacing:-.05em; line-height:1.05; margin-bottom:1rem; }
+.hero-grad { background:linear-gradient(135deg,#fff 0%,var(--accent-3) 40%,var(--accent) 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.hero-sub { color:var(--text-muted); font-size:1rem; max-width:540px; margin:0 auto 1.75rem; }
+.hero-credits { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:.75rem; }
+.free-badge { border-color:rgba(124,92,252,.4)!important; color:var(--accent-2)!important; }
+
+.section-label { font-family:var(--font-mono); font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.12em; color:var(--text-muted); margin-bottom:.9rem; }
+
+/* Character card */
+.char-card { display:flex; flex-direction:column; }
+.char-head { display:flex; align-items:center; gap:.6rem; margin-bottom:1.25rem; }
+.char-num {
+  width:30px; height:30px; border-radius:50%; flex:0 0 auto;
+  background:var(--accent); color:#fff; font-weight:800; font-family:var(--font-mono);
+  display:flex; align-items:center; justify-content:center; font-size:.9rem;
+}
+.char-title { font-weight:800; font-size:1.1rem; letter-spacing:-.02em; }
+.char-status { margin-left:auto; font-family:var(--font-mono); font-size:.7rem; color:var(--text-muted); border:1px solid var(--border-2); border-radius:99px; padding:.2rem .7rem; }
+.char-status.approved { color:var(--success); border-color:rgba(52,211,153,.4); }
+
+/* Mode toggle */
+.mode-toggle { display:flex; background:var(--bg-3); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:1rem; }
+.mode-btn { flex:1; padding:.5rem; border:none; border-radius:9px; background:transparent; color:var(--text-muted); font-family:var(--font-main); font-weight:600; font-size:.85rem; cursor:pointer; transition:all .2s; }
+.mode-btn.active { background:var(--accent); color:#fff; }
+
+.mode-pane { margin-bottom:1rem; }
+.drop-zone { border:2px dashed var(--border-2); border-radius:12px; padding:1.5rem; text-align:center; cursor:pointer; transition:all .2s; color:var(--text-muted); font-size:.85rem; background:var(--bg-3); }
+.drop-zone:hover, .drop-zone.drag-over { border-color:var(--accent); background:rgba(124,92,252,.06); color:var(--accent-2); }
+.drop-zone.has-image { border-style:solid; border-color:var(--accent); }
+
+/* Generate button */
+.generate-btn { width:100%; padding:.75rem; border-radius:14px; border:none; cursor:pointer; background:linear-gradient(135deg,var(--accent),#5a3fcf); color:#fff; font-size:1rem; font-weight:700; font-family:var(--font-main); transition:all .2s; margin-bottom:.5rem; box-shadow:0 4px 24px rgba(124,92,252,.3); }
+.generate-btn:hover { transform:translateY(-2px); box-shadow:0 8px 32px rgba(124,92,252,.45); }
+.generate-btn:disabled { opacity:.55; transform:none; cursor:not-allowed; box-shadow:none; }
+.generate-btn-video { background:linear-gradient(135deg,#3d6ee8,#2a4fcf); box-shadow:0 4px 24px rgba(61,110,232,.3); }
+.generate-btn-video:hover { box-shadow:0 8px 32px rgba(61,110,232,.45); }
+.credit-note { font-size:.75rem; color:var(--text-muted); text-align:center; margin-bottom:1rem; }
+
+/* Output */
+.output-area { background:var(--bg-3); border:1px solid var(--border); border-radius:var(--radius-lg); min-height:300px; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; }
+.output-area img, .output-area video { max-width:100%; max-height:460px; width:100%; border-radius:var(--radius); display:none; object-fit:contain; }
+.spin-out video { display:block!important; }
+.output-placeholder { text-align:center; width:100%; padding:1rem; }
+.placeholder-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px; width:150px; height:115px; margin:0 auto 1rem; border-radius:10px; overflow:hidden; opacity:.35; }
+.ph-tile { border-radius:3px; }
+.ph-text { font-size:.82rem; color:var(--text-muted); opacity:.6; margin:0; }
+
+.shimmer-overlay { display:none; position:absolute; inset:0; background:linear-gradient(90deg,transparent 0%,rgba(124,92,252,.08) 50%,transparent 100%); background-size:200% 100%; animation:shimmer 1.5s infinite; }
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+.gen-error { background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.2); color:var(--danger); border-radius:10px; padding:.75rem 1rem; font-size:.85rem; margin-top:.75rem; }
+
+.review-row { display:flex; gap:.6rem; margin-top:.9rem; }
+.review-row .btn-accent, .review-row .btn-outline-accent { flex:1; text-align:center; }
+
+.spin-sec { margin-top:1.25rem; padding-top:1.25rem; border-top:1px solid var(--border); }
+.approved-pill { display:inline-flex; align-items:center; gap:.4rem; color:var(--success); background:rgba(52,211,153,.1); border:1px solid rgba(52,211,153,.25); border-radius:99px; padding:.3rem .9rem; font-size:.78rem; font-weight:600; margin-bottom:.9rem; }
+
+/* Progress */
+.progress-wrap { margin:1rem 0; padding:1rem 1.25rem; background:var(--bg-3); border:1px solid var(--border); border-radius:14px; }
+.progress-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:.6rem; font-size:.85rem; font-weight:600; }
+.progress-time { font-family:var(--font-mono); font-size:.8rem; color:var(--accent-2); }
+.progress-track { background:var(--bg-2); border-radius:99px; height:8px; overflow:hidden; }
+.progress-bar { height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius:99px; transition:width 1s linear; }
+.progress-hint { font-size:.75rem; color:var(--text-muted); margin-top:.5rem; text-align:center; }
+
+/* Action section */
+.action-lock { text-align:center; padding:2.5rem 1rem; color:var(--text-muted); }
+.action-lock .lock-icon { font-size:2rem; display:block; margin-bottom:.75rem; opacity:.5; }
+.action-lock p { margin:0; font-size:.9rem; }
+.action-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:.6rem; margin-bottom:.5rem; }
+.action-chip { display:flex; flex-direction:column; align-items:center; gap:.35rem; padding:1rem .5rem; border-radius:14px; border:1px solid var(--border-2); background:var(--bg-3); color:var(--text); font-size:.85rem; font-weight:600; cursor:pointer; transition:all .15s; }
+.action-chip:hover { border-color:var(--accent); background:rgba(124,92,252,.06); transform:translateY(-2px); }
+.action-chip.selected { border-color:var(--accent); background:var(--accent); color:#fff; }
+.action-emoji { font-size:1.5rem; }
+.output-actions { display:flex; gap:.5rem; margin-top:.75rem; }
+.mb-6 { margin-bottom:4rem; }
+
+@media (max-width:768px){ .char-hero { padding:2rem 1rem 1.25rem; } }
+</style>
+
+<script>
+const LOGGED_IN = {{ 'true' if user else 'false' }};
+
+const chars = {
+  1: { mode:'describe', file:null, image:null, approved:false },
+  2: { mode:'describe', file:null, image:null, approved:false },
+};
+let selectedAction = null;
+const timers = {};
+
+/* ── Auth ──────────────────────────────────────────── */
+function onAuthSuccess(data){
+  window.LOGGED_IN = true;
+  document.querySelectorAll('.hero-credits').forEach(el => {
+    el.innerHTML = `
+      <span class="credit-badge"><span class="dot"></span><span id="img-credits">${data.picture_credits}</span> image credits</span>
+      <span class="credit-badge"><span class="dot" style="background:var(--accent-3)"></span><span id="vid-credits">${data.video_credits}</span> video credits</span>
+      <a href="/buy-credits" class="btn-accent" style="padding:.45rem 1.2rem;font-size:.85rem;">+ Buy credits</a>`;
+  });
+  if (window._pending) { window._pending(); window._pending = null; }
+}
+function requireAuth(fn){
+  if (LOGGED_IN || window.LOGGED_IN) { fn(); return; }
+  window._pending = fn;
+  openAuthModal('signup');
+}
+
+/* ── Small helpers ─────────────────────────────────── */
+function show(id){ const e=document.getElementById(id); if(e) e.style.display=''; }
+function hide(id){ const e=document.getElementById(id); if(e) e.style.display='none'; }
+function showErr(id,msg){ const e=document.getElementById(id); if(e){ e.textContent=msg; e.style.display='block'; } }
+function setStatus(i,text,approved){
+  const e=document.getElementById('status-'+i);
+  if(!e) return; e.textContent=text;
+  e.classList.toggle('approved', !!approved);
+}
+function decCredit(id){ const e=document.getElementById(id); if(e){ const n=parseInt(e.textContent); if(!isNaN(n)) e.textContent=Math.max(0,n-1); } }
+function decVideo(id,secs){ const e=document.getElementById(id); if(e){ const n=parseInt(e.textContent); if(!isNaN(n)) e.textContent=Math.max(0,n-secs); } }
+
+function setBtnLoading(btnId, on, shimmerId){
+  const btn=document.getElementById(btnId);
+  if(btn){ btn.disabled=on; btn.querySelector('.btn-text').style.display=on?'none':''; btn.querySelector('.btn-spinner').style.display=on?'':'none'; }
+  if(shimmerId){ const s=document.getElementById(shimmerId); if(s) s.style.display=on?'block':'none'; }
+}
+
+function startProgress(prefix){
+  let el=0; const MAX=120;
+  show(prefix+'-wrap');
+  document.getElementById(prefix+'-bar').style.width='0%';
+  document.getElementById(prefix+'-elapsed').textContent='0';
+  timers[prefix]=setInterval(()=>{
+    el++; document.getElementById(prefix+'-elapsed').textContent=el;
+    document.getElementById(prefix+'-bar').style.width=Math.min(95,(el/MAX)*100)+'%';
+  },1000);
+}
+function stopProgress(prefix){
+  if(timers[prefix]){ clearInterval(timers[prefix]); timers[prefix]=null; }
+  const b=document.getElementById(prefix+'-bar'); if(b) b.style.width='100%';
+  setTimeout(()=>hide(prefix+'-wrap'),400);
+}
+
+/* ── Mode toggle ───────────────────────────────────── */
+function setMode(i, mode){
+  chars[i].mode = mode;
+  document.getElementById('mode-describe-'+i).classList.toggle('active', mode==='describe');
+  document.getElementById('mode-upload-'+i).classList.toggle('active', mode==='upload');
+  document.getElementById('describe-pane-'+i).style.display = mode==='describe' ? '' : 'none';
+  document.getElementById('upload-pane-'+i).style.display = mode==='upload' ? '' : 'none';
+}
+
+/* ── File upload / drag & drop ─────────────────────── */
+function handleFile(i, input){ if(input.files[0]) loadFile(i, input.files[0]); }
+function loadFile(i, file){
+  if(!file.type.startsWith('image/')) return;
+  chars[i].file = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const prev=document.getElementById('drop-preview-'+i);
+    prev.src=e.target.result; prev.style.display='block';
+    document.getElementById('drop-label-'+i).textContent=file.name;
+    document.getElementById('drop-'+i).classList.add('has-image');
+  };
+  reader.readAsDataURL(file);
+}
+[1,2].forEach(i => {
+  const zone=document.getElementById('drop-'+i);
+  if(!zone) return;
+  zone.addEventListener('dragover', e=>{ e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', ()=>zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e=>{ e.preventDefault(); zone.classList.remove('drag-over'); if(e.dataTransfer.files[0]) loadFile(i, e.dataTransfer.files[0]); });
+});
+
+/* ── Generate character image ──────────────────────── */
+function generateCharacter(i){ requireAuth(()=>_generateCharacter(i)); }
+async function _generateCharacter(i){
+  const st = chars[i];
+  const fd = new FormData();
+  if(st.mode==='upload'){
+    if(!st.file){ showErr('img-err-'+i,'Upload a photo first.'); return; }
+    fd.append('image_file', st.file);
+  } else {
+    const d = document.getElementById('desc-'+i).value.trim();
+    if(!d){ showErr('img-err-'+i,'Describe your character first.'); return; }
+    fd.append('description', d);
+  }
+  hide('img-err-'+i);
+  setBtnLoading('gen-btn-'+i, true, 'shimmer-'+i);
+  document.getElementById('ph-'+i).style.display='';
+  document.getElementById('img-'+i).style.display='none';
+  try{
+    const res = await fetch('/studios/percfectcharacter/generate-image', {method:'POST', body:fd});
+    const data = await res.json();
+    if(!res.ok){ showErr('img-err-'+i, data.error || 'Generation failed.'); return; }
+    const img = document.getElementById('img-'+i);
+    img.src = data.url;
+    img.onload = () => { img.style.display='block'; document.getElementById('ph-'+i).style.display='none'; };
+    st.image = data.url;
+    st.approved = false;
+    document.getElementById('review-'+i).style.display='flex';
+    document.getElementById('spin-sec-'+i).style.display='none';
+    setStatus(i,'Review', false);
+    decCredit('img-credits');
+    refreshActionLock();
+  }catch(e){ showErr('img-err-'+i,'Network error — please try again.'); }
+  finally{ setBtnLoading('gen-btn-'+i, false, 'shimmer-'+i); }
+}
+
+/* ── Approve ───────────────────────────────────────── */
+function approveCharacter(i){
+  if(!chars[i].image) return;
+  chars[i].approved = true;
+  document.getElementById('review-'+i).style.display='none';
+  document.getElementById('spin-sec-'+i).style.display='block';
+  setStatus(i,'✓ Approved', true);
+  refreshActionLock();
+}
+
+/* ── 360 spin ──────────────────────────────────────── */
+function generateSpin(i){ requireAuth(()=>_generateSpin(i)); }
+async function _generateSpin(i){
+  const st = chars[i];
+  if(!st.image){ showErr('spin-err-'+i,'Approve a character first.'); return; }
+  hide('spin-err-'+i);
+  setBtnLoading('spin-btn-'+i, true);
+  startProgress('spin'+i);
+  const fd = new FormData();
+  fd.append('image_url', st.image);
+  try{
+    const res = await fetch('/studios/percfectcharacter/generate-spin', {method:'POST', body:fd});
+    const data = await res.json();
+    if(!res.ok){ showErr('spin-err-'+i, data.error || 'Generation failed.'); return; }
+    const vid = document.getElementById('spin-vid-'+i);
+    vid.src = data.url;
+    document.getElementById('spin-out-'+i).style.display='flex';
+    vid.play().catch(()=>{});
+    decVideo('vid-credits', 6);
+  }catch(e){ showErr('spin-err-'+i,'Network error — please try again.'); }
+  finally{ setBtnLoading('spin-btn-'+i, false); stopProgress('spin'+i); }
+}
+
+/* ── Action ────────────────────────────────────────── */
+function refreshActionLock(){
+  const ready = chars[1].approved && chars[2].approved;
+  document.getElementById('action-lock').style.display = ready ? 'none' : 'block';
+  document.getElementById('action-body').style.display = ready ? 'block' : 'none';
+}
+function selectAction(key){
+  selectedAction = key;
+  document.querySelectorAll('.action-chip').forEach(c => c.classList.remove('selected'));
+  document.getElementById('action-chip-'+key).classList.add('selected');
+  document.getElementById('action-btn').disabled = false;
+}
+function generateAction(){ requireAuth(_generateAction); }
+async function _generateAction(){
+  if(!selectedAction){ showErr('action-err','Pick an action first.'); return; }
+  if(!chars[1].image || !chars[2].image){ showErr('action-err','Approve both characters first.'); return; }
+  hide('action-err');
+  setBtnLoading('action-btn', true, 'action-shimmer');
+  startProgress('action');
+  document.getElementById('action-ph').style.display='';
+  document.getElementById('action-vid').style.display='none';
+  document.getElementById('action-actions').style.display='none';
+  const fd = new FormData();
+  fd.append('image_a', chars[1].image);
+  fd.append('image_b', chars[2].image);
+  fd.append('action', selectedAction);
+  try{
+    const res = await fetch('/studios/percfectcharacter/generate-action', {method:'POST', body:fd});
+    const data = await res.json();
+    if(!res.ok){ showErr('action-err', data.error || 'Generation failed.'); return; }
+    const vid = document.getElementById('action-vid');
+    vid.src = data.url;
+    vid.style.display='block';
+    document.getElementById('action-ph').style.display='none';
+    document.getElementById('action-dl').href = data.url;
+    document.getElementById('action-actions').style.display='flex';
+    vid.play().catch(()=>{});
+    decVideo('vid-credits', 6);
+  }catch(e){ showErr('action-err','Network error — please try again.'); }
+  finally{ setBtnLoading('action-btn', false, 'action-shimmer'); stopProgress('action'); }
+}
+</script>
+{% endblock %}

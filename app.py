@@ -11,6 +11,8 @@ import uuid
 import datetime
 import requests
 import stripe
+from io import BytesIO
+from PIL import Image
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -72,6 +74,93 @@ PRINCESS_STYLES = {
     "fantasy": "epic fantasy art, painterly brushstrokes, dramatic rim lighting, storybook illustration",
     "cinematic": "cinematic portrait photography, shallow depth of field, film grain, golden hour glow",
 }
+
+# ── Percfect Characters ───────────────────────────────────
+# Suffix appended to a user's text description (text → character image).
+CHARACTER_TEXT_SUFFIX = (
+    ", full body view, casual standing pose, plain white background, "
+    "high quality 3D animated Pixar-style character, smooth shading, "
+    "professional 3D render, clean character design"
+)
+
+# Prompt used when the user uploads a reference photo (image → character image).
+CHARACTER_IMAGE_PROMPT = (
+    "Transform the character into a clean, high-quality, 3D-style illustration on a "
+    "pure white background. Show full body, standing straight in casual pose. Keep the "
+    "exact face, hairstyle, clothing, colors, and proportions as the original character. "
+    "High detail, sharp lines, consistent lighting, no distortion. Full body, professional "
+    "character design like a modern animated video game render."
+)
+
+# Prompt for the 360° character-select spin video.
+CHARACTER_SPIN_PROMPT = (
+    "Create a smooth, slow-motion 360-degree rotation of the character on a clean white "
+    "background. The character should rotate like a 3D model on a video game character "
+    "selection screen. Keep perfectly consistent in face, body, clothing, and proportions "
+    "during every angle. High-quality animation, smooth movement, slow speed, completing one "
+    "full 360-degree slow-motion rotation."
+)
+
+# Two-character action videos. Each uses both approved character images (composited
+# side-by-side into one frame) plus the action prompt below, sent to the video generator.
+_ACTION_BASE = (
+    "The two characters from the image come together in a single shared scene on a clean "
+    "background. {action} Smooth cinematic animation, fluid natural motion, keep each "
+    "character perfectly consistent in face, body, clothing and proportions, high quality "
+    "3D animated style."
+)
+CHARACTER_ACTIONS = {
+    "fight":    {"label": "Fight",      "emoji": "🥊", "action": "They engage in an energetic, dynamic martial-arts fight with dodging, striking and acrobatic action poses."},
+    "romance":  {"label": "Romance",    "emoji": "💕", "action": "They share a tender romantic moment, drawing close and gazing at each other with gentle affectionate movement."},
+    "dance":    {"label": "Dance",      "emoji": "💃", "action": "They dance together joyfully and in sync, with flowing, graceful, rhythmic movement."},
+    "hug":      {"label": "Hug",        "emoji": "🤗", "action": "They walk toward each other and share a warm, friendly embrace."},
+    "highfive": {"label": "High Five",  "emoji": "🙌", "action": "They celebrate together with an enthusiastic high five and cheerful, bouncy movement."},
+    "faceoff":  {"label": "Face-Off",   "emoji": "⚔️", "action": "They face off in a dramatic stare-down before an epic showdown, with intense cinematic tension."},
+}
+
+
+def character_action_prompt(action_key: str) -> str:
+    act = CHARACTER_ACTIONS.get(action_key)
+    if not act:
+        return ""
+    return _ACTION_BASE.format(action=act["action"])
+
+
+def _load_image_any(url: str) -> Image.Image:
+    """Load an image from a data: URI or an http(s) URL into a PIL image."""
+    if url.startswith("data:"):
+        _, b64 = url.split(",", 1)
+        raw = base64.b64decode(b64)
+    else:
+        resp = requests.get(url, timeout=60)
+        resp.raise_for_status()
+        raw = resp.content
+    return Image.open(BytesIO(raw)).convert("RGB")
+
+
+def composite_two_characters(url_a: str, url_b: str) -> str:
+    """Place two approved character images side-by-side on a white frame and return a data URI.
+
+    The video generator only accepts one source image, so the two characters must share a
+    single frame before they can be animated together.
+    """
+    target_h = 768
+    frames = []
+    for u in (url_a, url_b):
+        im = _load_image_any(u)
+        w = max(1, int(im.width * target_h / im.height))
+        frames.append(im.resize((w, target_h)))
+    gap = 24
+    total_w = sum(f.width for f in frames) + gap
+    canvas = Image.new("RGB", (total_w, target_h), (255, 255, 255))
+    x = 0
+    for f in frames:
+        canvas.paste(f, (x, 0))
+        x += f.width + gap
+    buf = BytesIO()
+    canvas.save(buf, format="JPEG", quality=90)
+    return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+
 
 # Credit packages: price_id -> (image_credits, video_credits)
 CREDIT_PACKAGES = {
@@ -1406,6 +1495,154 @@ def princess_generate():
 
         return jsonify({"url": image_url, "prompt": full_prompt, "remaining": remaining})
 
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ── Percfect Characters ───────────────────────────────────
+@app.route("/studios/percfectcharacter")
+def percfect_character():
+    user_data = None
+    if current_user.is_authenticated:
+        reset_daily_if_needed(current_user.id)
+        res = supabase.table("users").select(
+            "picture_credits,video_credits,images_today,videos_today"
+        ).eq("id", current_user.id).single().execute()
+        user_data = res.data
+    return render_template(
+        "percfect_character.html",
+        user=user_data,
+        actions=CHARACTER_ACTIONS,
+    )
+
+
+@app.route("/studios/percfectcharacter/generate-image", methods=["POST"])
+@login_required
+def character_generate_image():
+    reset_daily_if_needed(current_user.id)
+    res = supabase.table("users").select("picture_credits,images_today").eq("id", current_user.id).single().execute()
+    user_data = res.data
+
+    if not current_user.is_admin and user_data["picture_credits"] <= 0:
+        return jsonify({"error": "No image credits remaining."}), 402
+
+    source_image = _get_form_image_url()
+    description = request.form.get("description", "").strip()
+
+    if source_image:
+        full_prompt = CHARACTER_IMAGE_PROMPT
+    elif description:
+        full_prompt = description + CHARACTER_TEXT_SUFFIX
+    else:
+        return jsonify({"error": "Upload an image or describe your character."}), 400
+
+    try:
+        result = generate_image_xai(full_prompt, source_image)
+        image_url = result["data"][0]["url"]
+
+        if not current_user.is_admin:
+            supabase.table("users").update({
+                "picture_credits": user_data["picture_credits"] - 1,
+                "images_today": user_data["images_today"] + 1,
+            }).eq("id", current_user.id).execute()
+
+        supabase.table("generations").insert({
+            "user_id": current_user.id,
+            "type": "image",
+            "prompt": full_prompt,
+            "output_url": image_url,
+            "created_at": datetime.datetime.utcnow().isoformat(),
+        }).execute()
+
+        return jsonify({"url": image_url})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/studios/percfectcharacter/generate-spin", methods=["POST"])
+@login_required
+def character_generate_spin():
+    reset_daily_if_needed(current_user.id)
+    res = supabase.table("users").select("video_credits,videos_today").eq("id", current_user.id).single().execute()
+    user_data = res.data
+
+    image_url = request.form.get("image_url", "").strip()
+    if not image_url:
+        return jsonify({"error": "Approve a character image first."}), 400
+
+    duration = 6
+    if not current_user.is_admin and user_data["video_credits"] < duration:
+        return jsonify({"error": f"Not enough video seconds. You have {user_data['video_credits']}s remaining."}), 402
+
+    try:
+        result = generate_video_xai(CHARACTER_SPIN_PROMPT, image_url, duration)
+        video_url = (result.get("video") or {}).get("url") \
+            or result.get("url") \
+            or (result.get("data") or [{}])[0].get("url")
+
+        if not current_user.is_admin:
+            supabase.table("users").update({
+                "video_credits": user_data["video_credits"] - duration,
+                "videos_today": user_data["videos_today"] + 1,
+            }).eq("id", current_user.id).execute()
+
+        supabase.table("generations").insert({
+            "user_id": current_user.id,
+            "type": "video",
+            "prompt": CHARACTER_SPIN_PROMPT,
+            "output_url": video_url,
+            "created_at": datetime.datetime.utcnow().isoformat(),
+        }).execute()
+
+        return jsonify({"url": video_url})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/studios/percfectcharacter/generate-action", methods=["POST"])
+@login_required
+def character_generate_action():
+    reset_daily_if_needed(current_user.id)
+    res = supabase.table("users").select("video_credits,videos_today").eq("id", current_user.id).single().execute()
+    user_data = res.data
+
+    image_a = request.form.get("image_a", "").strip()
+    image_b = request.form.get("image_b", "").strip()
+    action = request.form.get("action", "")
+
+    if not image_a or not image_b:
+        return jsonify({"error": "Approve both characters first."}), 400
+
+    prompt = character_action_prompt(action)
+    if not prompt:
+        return jsonify({"error": "Pick an action."}), 400
+
+    duration = 6
+    if not current_user.is_admin and user_data["video_credits"] < duration:
+        return jsonify({"error": f"Not enough video seconds. You have {user_data['video_credits']}s remaining."}), 402
+
+    try:
+        composite = composite_two_characters(image_a, image_b)
+        result = generate_video_xai(prompt, composite, duration)
+        video_url = (result.get("video") or {}).get("url") \
+            or result.get("url") \
+            or (result.get("data") or [{}])[0].get("url")
+
+        if not current_user.is_admin:
+            supabase.table("users").update({
+                "video_credits": user_data["video_credits"] - duration,
+                "videos_today": user_data["videos_today"] + 1,
+            }).eq("id", current_user.id).execute()
+
+        supabase.table("generations").insert({
+            "user_id": current_user.id,
+            "type": "video",
+            "prompt": prompt,
+            "output_url": video_url,
+            "created_at": datetime.datetime.utcnow().isoformat(),
+        }).execute()
+
+        return jsonify({"url": video_url})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
