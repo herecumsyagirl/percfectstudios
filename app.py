@@ -460,14 +460,16 @@ def generate_image_fal(prompt: str, num_images: int = 10) -> list:
         raise Exception(f"fal submit error {resp.status_code}: {resp.text}")
 
     job = resp.json()
-    request_id = job.get("request_id")
-    if not request_id:
-        images = job.get("images") or []
+    if job.get("status") == "COMPLETED" or job.get("images"):
+        images = job.get("images") or (job.get("response") or {}).get("images") or []
         return [img["url"] for img in images if img.get("url")]
 
+    status_url = job.get("status_url")
+    result_url = job.get("response_url")
+    if not status_url or not result_url:
+        raise Exception("fal queue did not return status/response URLs")
+
     import time
-    status_url = f"https://queue.fal.run/{FAL_MODEL}/requests/{request_id}/status"
-    result_url = f"https://queue.fal.run/{FAL_MODEL}/requests/{request_id}"
     for _ in range(90):
         time.sleep(2)
         st = requests.get(status_url, headers=headers, timeout=30)
