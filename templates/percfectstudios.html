@@ -79,11 +79,23 @@
           <input class="form-control mt-2" id="img-image-url" type="url" placeholder="…or paste an image URL" style="font-size:0.8rem;padding:0.45rem 0.75rem;" />
         </div>
 
+        <label class="six-toggle"><input type="checkbox" id="img-sixway" /> <span>🔲 6-way split screen</span><span class="six-hint">wraps as "multi-action, six-way split screen depicting …"</span></label>
+
         <button class="generate-btn" id="img-btn" onclick="generateImage()">
           <span id="img-btn-text">✦ Generate image</span>
           <span id="img-btn-spinner" style="display:none">Generating…</span>
         </button>
-        <p class="credit-note">1 credit · <a href="#" onclick="openAuthModal('signup');return false;" {% if user %}style="display:none"{% endif %}>Sign up to get started</a></p>
+        <button class="generate-btn generate-btn-batch" id="batch-btn" onclick="generateBatch()">
+          <span id="batch-btn-text">✦✦ Generate 10 (batch)</span>
+          <span id="batch-btn-spinner" style="display:none">Generating 10…</span>
+        </button>
+        <p class="credit-note">1 credit each · batch = 10 credits (you're only charged for images that succeed) · <a href="#" onclick="openAuthModal('signup');return false;" {% if user %}style="display:none"{% endif %}>Sign up to get started</a></p>
+
+        <div id="batch-result" style="display:none">
+          <p class="section-label" style="margin:.75rem 0 .4rem" id="batch-summary"></p>
+          <div class="batch-grid" id="batch-grid"></div>
+        </div>
+        <div id="batch-error" class="gen-error" style="display:none"></div>
 
         <div class="output-area" id="img-output-area">
           <div class="output-placeholder" id="img-placeholder">
@@ -271,6 +283,14 @@
 .generate-btn:disabled { opacity:.6;transform:none;cursor:not-allowed; }
 .generate-btn-video { background:linear-gradient(135deg,#3d6ee8,#2a4fcf); box-shadow:0 4px 24px rgba(61,110,232,.3); }
 .generate-btn-video:hover { box-shadow:0 8px 32px rgba(61,110,232,.45); }
+.generate-btn-batch { background:linear-gradient(135deg,#a855f7,#7c3aed); box-shadow:0 4px 24px rgba(124,58,237,.3); margin-top:.4rem; }
+.generate-btn-batch:hover { box-shadow:0 8px 32px rgba(124,58,237,.45); }
+.six-toggle { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin:.2rem 0 .6rem; font-size:.9rem; font-weight:600; cursor:pointer; }
+.six-toggle input { width:16px; height:16px; accent-color:var(--accent,#7c5cfc); cursor:pointer; }
+.six-hint { color:var(--text-muted); font-weight:400; font-size:.75rem; }
+.batch-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:.5rem; }
+.batch-grid a { display:block; border-radius:10px; overflow:hidden; border:1px solid var(--border-2,#333); aspect-ratio:1; }
+.batch-grid img { width:100%; height:100%; object-fit:cover; display:block; }
 
 .credit-note { font-size:.75rem;color:var(--text-muted);text-align:center;margin-bottom:1rem; }
 .credit-note a { color:var(--accent-2); }
@@ -393,9 +413,19 @@ document.addEventListener('keydown', e => {
 /* ── Generate image ────────────────────────────── */
 function generateImage() { requireAuth(_generateImage); }
 function generateVideo() { requireAuth(_generateVideo); }
+function generateBatch() { requireAuth(_generateBatch); }
+
+// Apply the optional "6-way split screen" wrapper to the raw prompt.
+function effectivePrompt() {
+  const p = document.getElementById('img-prompt').value.trim();
+  if (p && document.getElementById('img-sixway') && document.getElementById('img-sixway').checked) {
+    return 'Create a multi-action, six-way split screen depicting ' + p;
+  }
+  return p;
+}
 
 async function _generateImage() {
-  const prompt = document.getElementById('img-prompt').value.trim();
+  const prompt = effectivePrompt();
   if (!prompt) { showError('img','Please describe what you want to generate.'); return; }
   setLoading('img', true);
   const fd = new FormData();
@@ -422,6 +452,46 @@ async function _generateImage() {
     loadGallery();
   } catch(e) { showError('img','Network error — please try again.'); }
   finally { setLoading('img', false); }
+}
+
+function showBatchError(m){ const e=document.getElementById('batch-error'); e.textContent=m; e.style.display='block'; }
+async function _generateBatch() {
+  const prompt = effectivePrompt();
+  if (!prompt) { showBatchError('Please describe what you want to generate.'); return; }
+  const batchBtn = document.getElementById('batch-btn'), imgBtn = document.getElementById('img-btn');
+  batchBtn.disabled = true; imgBtn.disabled = true;
+  document.getElementById('batch-btn-text').style.display = 'none';
+  document.getElementById('batch-btn-spinner').style.display = '';
+  document.getElementById('batch-error').style.display = 'none';
+  document.getElementById('batch-result').style.display = 'none';
+  const fd = new FormData();
+  fd.append('prompt', prompt);
+  const style = document.querySelector('#img-style-chips .style-chip.active');
+  if (style) fd.append('style', style.textContent.trim());
+  const imgUrl = document.getElementById('img-image-url').value.trim();
+  if (imgUrl) fd.append('image_url', imgUrl);
+  if (window._droppedImgFile) fd.append('image_file', window._droppedImgFile);
+  try {
+    const res = await fetch('/percfectstudios/generate-batch', {method:'POST', body:fd});
+    let data; try { data = await res.json(); } catch(_e) { data = {}; }
+    if (!res.ok || !data.urls) { showBatchError(data.error || 'Batch failed. You were not charged.'); return; }
+    const grid = document.getElementById('batch-grid'); grid.innerHTML = '';
+    data.urls.forEach((u,i) => {
+      const a = document.createElement('a'); a.href = u; a.target = '_blank'; a.download = 'percfect-'+(i+1)+'.jpg';
+      const im = document.createElement('img'); im.src = u; a.appendChild(im); grid.appendChild(a);
+    });
+    document.getElementById('batch-summary').textContent =
+      `${data.made} of 10 created${data.failed ? ` · ${data.failed} filtered (not charged)` : ''} · ${data.charged} credits used`;
+    document.getElementById('batch-result').style.display = 'block';
+    const el = document.getElementById('img-credits');
+    if (el) { const n = parseInt(el.textContent); if (!isNaN(n)) el.textContent = Math.max(0, n - data.charged); }
+    loadGallery();
+  } catch(e) { showBatchError('Network error — please try again.'); }
+  finally {
+    batchBtn.disabled = false; imgBtn.disabled = false;
+    document.getElementById('batch-btn-text').style.display = '';
+    document.getElementById('batch-btn-spinner').style.display = 'none';
+  }
 }
 
 let _vidTimer = null;

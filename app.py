@@ -1106,6 +1106,66 @@ def generate_image():
         return jsonify({"error": _friendly_image_error(e), "charged": False}), 422
 
 
+@app.route("/percfectstudios/generate-batch", methods=["POST"])
+@login_required
+def generate_batch():
+    """Generate a batch of images from one prompt. Runs concurrently, charges 1 credit
+    per image that actually succeeds (failures are free), and returns all the URLs."""
+    BATCH_N = 10
+    reset_daily_if_needed(current_user.id)
+    res = supabase.table("users").select("picture_credits,images_today").eq("id", current_user.id).single().execute()
+    user_data = res.data
+
+    prompt = request.form.get("prompt", "").strip()
+    style = request.form.get("style", "")
+    if not prompt:
+        return jsonify({"error": "Prompt is required."}), 400
+    if not current_user.is_admin and user_data["picture_credits"] < BATCH_N:
+        return jsonify({"error": f"A batch of {BATCH_N} needs {BATCH_N} image credits — you have "
+                                 f"{user_data['picture_credits']}. Buy credits or redeem a coupon code."}), 402
+
+    full_prompt = f"{prompt}. Style: {style}" if style else prompt
+    source_image = _get_form_image_url()
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _one(_i):
+        try:
+            r = generate_image_xai(full_prompt, source_image)
+            data = (r or {}).get("data") or []
+            return data[0].get("url") if data else None
+        except Exception:
+            return None
+
+    urls = []
+    with ThreadPoolExecutor(max_workers=BATCH_N) as ex:
+        for u in ex.map(_one, range(BATCH_N)):
+            if u:
+                urls.append(u)
+
+    made = len(urls)
+    if made and not current_user.is_admin:
+        supabase.table("users").update({
+            "picture_credits": max(0, user_data["picture_credits"] - made),
+            "images_today": user_data["images_today"] + made,
+        }).eq("id", current_user.id).execute()
+
+    now = datetime.datetime.utcnow().isoformat()
+    for u in urls:
+        try:
+            supabase.table("generations").insert({
+                "user_id": current_user.id, "type": "image",
+                "prompt": full_prompt, "output_url": u, "created_at": now,
+            }).execute()
+        except Exception:
+            pass
+
+    if not made:
+        return jsonify({"error": "None of the batch images generated — the prompt may have been "
+                                 "filtered. You were NOT charged.", "charged": 0}), 422
+    return jsonify({"urls": urls, "made": made, "failed": BATCH_N - made, "charged": made})
+
+
 @app.route("/percfectstudios/generate-video", methods=["POST"])
 @login_required
 def generate_video():
