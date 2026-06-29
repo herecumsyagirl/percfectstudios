@@ -1041,6 +1041,19 @@ def recent_generations():
         return jsonify([])
 
 
+def _friendly_image_error(e) -> str:
+    """Turn a raw xAI exception into a clear, user-facing reason. Credits are only
+    charged on success, so a failure here never costs the user a credit — say so."""
+    raw = str(e).lower()
+    if any(k in raw for k in ("moderat", "policy", "safety", "flagged", "nsfw", "rejected",
+                              "violat", "explicit", "blocked", "content filter", "not allowed")):
+        return ("That prompt was rejected by the image provider's content filter, so no image "
+                "was created. You were NOT charged a credit. Try rephrasing your prompt.")
+    if "timeout" in raw or "timed out" in raw:
+        return "The image provider timed out, so nothing was created. You were NOT charged — please try again."
+    return "The image couldn't be generated. You were NOT charged a credit. Please try again."
+
+
 @app.route("/percfectstudios/generate-image", methods=["POST"])
 @login_required
 def generate_image():
@@ -1061,7 +1074,15 @@ def generate_image():
 
     try:
         result = generate_image_xai(full_prompt, source_image)
-        image_url = result["data"][0]["url"]
+        data = (result or {}).get("data") or []
+        image_url = data[0].get("url") if data else None
+        if not image_url:
+            # Provider returned no image (often a silent content rejection).
+            return jsonify({
+                "error": "No image was returned — this usually means the prompt was filtered. "
+                         "You were NOT charged a credit. Try rephrasing your prompt.",
+                "charged": False,
+            }), 422
 
         if not current_user.is_admin:
             supabase.table("users").update({
@@ -1080,7 +1101,7 @@ def generate_image():
         return jsonify({"url": image_url, "type": "image"})
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": _friendly_image_error(e), "charged": False}), 422
 
 
 @app.route("/percfectstudios/generate-video", methods=["POST"])

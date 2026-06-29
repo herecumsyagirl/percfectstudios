@@ -95,7 +95,7 @@
             </div>
             <p class="ph-text">Your image will appear here</p>
           </div>
-          <div class="shimmer-overlay" id="img-shimmer"></div>
+          <div class="loading-overlay" id="img-loading"><div class="spinner"></div><p>Generating your image…<br><small>5–15 seconds</small></p></div>
           <img id="img-result" src="" alt="" />
         </div>
 
@@ -168,7 +168,7 @@
             </div>
             <p class="ph-text">Your video will appear here</p>
           </div>
-          <div class="shimmer-overlay" id="vid-shimmer"></div>
+          <div class="loading-overlay" id="vid-loading"><div class="spinner"></div><p>Generating your video…<br><small>~60 seconds</small></p></div>
           <video id="vid-result" controls loop playsinline></video>
         </div>
 
@@ -304,6 +304,17 @@
 }
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
+/* Spinner loading overlay */
+.loading-overlay{ display:none;position:absolute;inset:0;background:rgba(13,13,24,.92);
+  flex-direction:column;align-items:center;justify-content:center;text-align:center;
+  gap:.85rem;z-index:5;border-radius:inherit;backdrop-filter:blur(4px);color:var(--accent-3,#a78bfa); }
+.loading-overlay.show{ display:flex; }
+.loading-overlay p{ margin:0;font-weight:700;font-size:1.02rem; }
+.loading-overlay small{ color:var(--text-muted);font-weight:500;font-size:.78rem; }
+.spinner{ width:48px;height:48px;border:4px solid var(--border,#333);border-top-color:var(--accent,#7c5cfc);
+  border-radius:50%;animation:spin .8s linear infinite; }
+@keyframes spin{ to{transform:rotate(360deg);} }
+
 .output-actions { display:flex;gap:.5rem;margin-top:.75rem; }
 .gen-error {
   background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);
@@ -396,8 +407,8 @@ async function _generateImage() {
   if (window._droppedImgFile) fd.append('image_file', window._droppedImgFile);
   try {
     const res = await fetch('/percfectstudios/generate-image', {method:'POST', body:fd});
-    const data = await res.json();
-    if (!res.ok) { showError('img', data.error || 'Generation failed.'); return; }
+    let data; try { data = await res.json(); } catch(_e) { data = {}; }
+    if (!res.ok || !data.url) { showError('img', data.error || 'Generation failed. You were not charged.'); return; }
     const img = document.getElementById('img-result');
     img.src = data.url;
     img.onload = () => {
@@ -476,9 +487,14 @@ function setLoading(panel, on) {
   document.getElementById(`${panel}-btn`).disabled = on;
   document.getElementById(`${panel}-btn-text`).style.display = on ? 'none' : '';
   document.getElementById(`${panel}-btn-spinner`).style.display = on ? '' : 'none';
-  document.getElementById(`${panel}-shimmer`).style.display = on ? 'block' : 'none';
+  const ld = document.getElementById(`${panel}-loading`); if (ld) ld.classList.toggle('show', on);
   document.getElementById(`${panel}-error`).style.display = 'none';
-  if (on) document.getElementById(`${panel}-placeholder`).style.display = '';
+  if (on) {
+    // Clear the previous result so the old image/video doesn't linger behind the spinner.
+    document.getElementById(`${panel}-placeholder`).style.display = '';
+    const r = document.getElementById(`${panel}-result`); if (r) r.style.display = 'none';
+    const a = document.getElementById(`${panel}-actions`); if (a) a.style.display = 'none';
+  }
 }
 
 function showError(panel, msg) {
