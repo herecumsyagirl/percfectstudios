@@ -14,6 +14,7 @@ import mimetypes
 import time
 import random
 import string
+import threading
 
 from prompt_presets import (
     PRINCESSES, OUTFITS, POSES, SCENES, EXPRESSIONS,
@@ -22,10 +23,128 @@ from prompt_presets import (
 
 ADDON = xbmcaddon.Addon()
 ADDON_ID = ADDON.getAddonInfo('id')
+ADDON_PATH = ADDON.getAddonInfo('path')
 BASE_URL = 'https://percfectai.com'
 PERCHANCE_URL = 'https://perchance.org/percfect-imagine'
 HANDLE = int(sys.argv[1]) if len(sys.argv) > 1 else 0
 LAST_BATCH_FILE = 'last_batch.json'
+SPLASH_MESSAGES = [
+    'Mixing princess presets…',
+    'Setting cinematic lighting…',
+    'Rendering your batch…',
+    'Polishing details…',
+    'Almost there…',
+]
+
+
+def res_path(*parts):
+    return os.path.join(ADDON_PATH, 'resources', *parts)
+
+
+def menu_art(icon_file=None):
+    art = {
+        'icon': res_path('icon.png'),
+        'thumb': res_path('icon.png'),
+        'fanart': res_path('fanart.jpg'),
+    }
+    if icon_file:
+        section = res_path('icons', icon_file)
+        art['thumb'] = section
+        art['poster'] = section
+    return art
+
+
+def add_menu_item(label, action, icon_file=None, plot='', is_folder=True):
+    li = xbmcgui.ListItem(label, label2=plot)
+    li.setArt(menu_art(icon_file))
+    li.setProperty('IsPlayable', 'false')
+    xbmcplugin.addDirectoryItem(
+        HANDLE,
+        f'plugin://{ADDON_ID}/?action={action}',
+        li,
+        is_folder,
+    )
+
+
+class GeneratingDialog(xbmcgui.WindowXMLDialog):
+    def __init__(self, title, subtitle, splash_path):
+        self._title = title
+        self._subtitle = subtitle
+        self._splash = splash_path
+        super().__init__('DialogGenerating.xml', ADDON_PATH, 'Default', '1080i')
+
+    def onInit(self):
+        self.getControl(100).setImage(self._splash)
+        self.getControl(101).setLabel(self._title)
+        self.getControl(102).setLabel(self._subtitle)
+        self.getControl(501).setPercent(0)
+        self.getControl(103).setLabel('0%')
+
+    def update(self, pct, message=None):
+        pct = int(max(0, min(100, pct)))
+        self.getControl(501).setPercent(pct)
+        self.getControl(103).setLabel(f'{pct}%')
+        if message:
+            self.getControl(102).setLabel(message)
+
+
+def run_with_splash(title, subtitle, work_fn, timeout=200):
+    splash = res_path('splash_generating.jpg')
+    icon = res_path('icon.png')
+    result = {'data': None, 'error': None, 'done': False, 'cancel': False}
+    dialog = None
+    progress = None
+
+    def worker():
+        try:
+            result['data'] = work_fn()
+        except Exception as exc:
+            result['error'] = exc
+        finally:
+            result['done'] = True
+
+    try:
+        dialog = GeneratingDialog(title, subtitle, splash)
+        dialog.show()
+    except Exception as exc:
+        xbmc.log(f'PercfectStudios splash fallback: {exc}', xbmc.LOGINFO)
+        dialog = None
+        progress = xbmcgui.DialogProgress()
+        progress.create(title, subtitle)
+
+    xbmcgui.Dialog().notification('PercfectStudios', subtitle, icon, 4000)
+    threading.Thread(target=worker, daemon=True).start()
+
+    pct = 5
+    tick = 0
+    while not result['done']:
+        if progress and progress.iscanceled():
+            result['cancel'] = True
+            break
+        msg = SPLASH_MESSAGES[tick % len(SPLASH_MESSAGES)]
+        pct = min(92, pct + 3)
+        if dialog:
+            dialog.update(pct, msg)
+        elif progress:
+            progress.update(pct, msg)
+        tick += 1
+        time.sleep(1.2)
+
+    if dialog:
+        try:
+            dialog.update(100 if not result['error'] else 0, 'Done!' if not result['error'] else 'Something went wrong…')
+            time.sleep(0.35)
+            dialog.close()
+        except Exception:
+            pass
+    elif progress:
+        progress.close()
+
+    if result['cancel']:
+        raise Exception('Cancelled')
+    if result['error']:
+        raise result['error']
+    return result['data']
 
 
 def get_api_key():
@@ -245,14 +364,14 @@ def perchance_help():
 def show_perchance_menu():
     xbmcplugin.setPluginCategory(HANDLE, 'PERCHANCE — free images')
     xbmcplugin.setContent(HANDLE, 'videos')
-    for label, action in [
-        ('Open Generator', 'pc_open'),
-        ('Phone Keyboard (QR)', 'pc_phone'),
-        ('Save Image URL', 'pc_save'),
-        ('How it works', 'pc_help'),
-    ]:
-        li = xbmcgui.ListItem(label)
-        xbmcplugin.addDirectoryItem(HANDLE, f'plugin://{ADDON_ID}/?action={action}', li, True)
+    items = [
+        ('Open Generator', 'pc_open', 'icon_perchance.png', 'Free Perchance princess factory'),
+        ('Phone Keyboard (QR)', 'pc_phone', 'icon_connect.png', 'Type prompts from your phone'),
+        ('Save Image URL', 'pc_save', 'icon_shared.png', 'Copy URL from Perchance → save here'),
+        ('How it works', 'pc_help', 'icon_perchance.png', 'Quick guide'),
+    ]
+    for label, action, icon, plot in items:
+        add_menu_item(label, action, icon, plot)
     xbmcplugin.endOfDirectory(HANDLE)
 
 
@@ -298,17 +417,12 @@ def fal_custom_prompt():
 
 def fal_run_generation(prompt):
     n = get_batch_size()
-    progress = xbmcgui.DialogProgress()
-    progress.create('FAL — FLUX Schnell', f'Generating {n} images… ~30–60s')
     try:
-        for pct in range(5, 85, 5):
-            if progress.iscanceled():
-                progress.close()
-                return
-            time.sleep(1)
-            progress.update(pct)
-        data = api_request('POST', '/api/generate/image', {'prompt': prompt, 'num_images': n}, timeout=180)
-        progress.close()
+        data = run_with_splash(
+            '✦ PercfectStudios',
+            f'FAL · FLUX Schnell · {n} images',
+            lambda: api_request('POST', '/api/generate/image', {'prompt': prompt, 'num_images': n}, timeout=180),
+        )
         urls = data.get('urls') or ([data['url']] if data.get('url') else [])
         if not urls:
             xbmcgui.Dialog().ok('Error', 'No images returned.')
@@ -318,15 +432,14 @@ def fal_run_generation(prompt):
             save_generation(url, 'image', prompt[:20])
         show_batch_gallery(urls, prompt)
     except urllib.error.HTTPError as e:
-        progress.close()
         try:
             err = json.loads(e.read().decode()).get('error', 'Generation failed.')
         except Exception:
             err = 'Generation failed.'
         xbmcgui.Dialog().ok('Error', err)
     except Exception as e:
-        progress.close()
-        xbmcgui.Dialog().ok('Error', str(e))
+        if str(e) != 'Cancelled':
+            xbmcgui.Dialog().ok('Error', str(e))
 
 
 def show_batch_gallery(urls, prompt=''):
@@ -362,14 +475,14 @@ def fal_view_last_batch():
 def show_fal_menu():
     xbmcplugin.setPluginCategory(HANDLE, 'FAL — FLUX Schnell batch')
     xbmcplugin.setContent(HANDLE, 'videos')
-    for label, action in [
-        ('Easy Generate (pick presets)', 'fal_easy'),
-        ('Surprise Me', 'fal_surprise'),
-        ('Custom Prompt', 'fal_custom'),
-        ('View Last Batch', 'fal_last'),
-    ]:
-        li = xbmcgui.ListItem(label)
-        xbmcplugin.addDirectoryItem(HANDLE, f'plugin://{ADDON_ID}/?action={action}', li, True)
+    items = [
+        ('Easy Generate (pick presets)', 'fal_easy', 'icon_fal.png', 'Princess · outfit · pose · scene'),
+        ('Surprise Me', 'fal_surprise', 'icon_fal.png', 'Random princess batch'),
+        ('Custom Prompt', 'fal_custom', 'icon_fal.png', 'Type your own idea'),
+        ('View Last Batch', 'fal_last', 'icon_shared.png', 'Re-open your last 10'),
+    ]
+    for label, action, icon, plot in items:
+        add_menu_item(label, action, icon, plot)
     xbmcplugin.endOfDirectory(HANDLE)
 
 
@@ -413,12 +526,13 @@ def animate_image_url(image_url):
     if vid_c < duration:
         show_buy_credits(f'Need {duration}s, have {vid_c}s.')
         return
-    progress = xbmcgui.DialogProgress()
-    progress.create('Video', f'Generating {duration}s 480p video…')
     try:
         payload = {'prompt': prompt, 'duration': duration, 'resolution': '480p', 'image_url': image_url}
-        data = api_request('POST', '/api/generate/video', payload, timeout=200)
-        progress.close()
+        data = run_with_splash(
+            '✦ PercfectStudios',
+            f'480p video · {duration}s',
+            lambda: api_request('POST', '/api/generate/video', payload, timeout=200),
+        )
         url = data.get('url')
         if url:
             save_generation(url, 'video', prompt)
@@ -426,8 +540,8 @@ def animate_image_url(image_url):
             li.setInfo('video', {'title': prompt})
             xbmc.Player().play(url, li)
     except Exception as e:
-        progress.close()
-        xbmcgui.Dialog().ok('Error', str(e))
+        if str(e) != 'Cancelled':
+            xbmcgui.Dialog().ok('Error', str(e))
 
 
 def generate_video():
@@ -463,21 +577,22 @@ def generate_video():
     if d_idx < 0:
         return
     duration = dur_secs[d_idx]
-    progress = xbmcgui.DialogProgress()
-    progress.create('Video', f'Generating {duration}s…')
     try:
         payload = {'prompt': prompt, 'duration': duration, 'resolution': '480p'}
         if source_image:
             payload['image_url'] = source_image
-        data = api_request('POST', '/api/generate/video', payload, timeout=200)
-        progress.close()
+        data = run_with_splash(
+            '✦ PercfectStudios',
+            f'480p video · {duration}s',
+            lambda: api_request('POST', '/api/generate/video', payload, timeout=200),
+        )
         url = data.get('url')
         if url:
             save_generation(url, 'video', prompt)
             xbmc.Player().play(url, xbmcgui.ListItem(prompt, path=url))
     except Exception as e:
-        progress.close()
-        xbmcgui.Dialog().ok('Error', str(e))
+        if str(e) != 'Cancelled':
+            xbmcgui.Dialog().ok('Error', str(e))
 
 
 def show_local_saves():
@@ -552,15 +667,15 @@ def show_buy_credits(message=''):
 def show_shared_menu():
     xbmcplugin.setPluginCategory(HANDLE, 'SHARED')
     xbmcplugin.setContent(HANDLE, 'videos')
-    for label, action in [
-        ('My Percfect Pics', 'sh_pics'),
-        ('Animate Video (480p)', 'sh_video'),
-        ('Account & Credits', 'sh_account'),
-        ('How to Install', 'sh_install'),
-        ('Settings', 'sh_settings'),
-    ]:
-        li = xbmcgui.ListItem(label)
-        xbmcplugin.addDirectoryItem(HANDLE, f'plugin://{ADDON_ID}/?action={action}', li, True)
+    items = [
+        ('My Percfect Pics', 'sh_pics', 'icon_shared.png', 'Your saved images & videos'),
+        ('Animate Video (480p)', 'sh_video', 'icon_fal.png', 'xAI motion from pics or text'),
+        ('Account & Credits', 'sh_account', 'icon_connect.png', 'QR connect · buy seconds'),
+        ('How to Install', 'sh_install', 'icon_connect.png', 'percfectai.com/k'),
+        ('Settings', 'sh_settings', 'icon_shared.png', 'API key · batch size · folder'),
+    ]
+    for label, action, icon, plot in items:
+        add_menu_item(label, action, icon, plot)
     xbmcplugin.endOfDirectory(HANDLE)
 
 
@@ -572,16 +687,14 @@ def main_menu():
     xbmcplugin.setPluginCategory(HANDLE, f'PercfectStudios — {vid}s video')
     xbmcplugin.setContent(HANDLE, 'videos')
     sections = [
-        ('PERCHANCE — free images', 'home_perchance'),
-        ('FAL — fast batch (FLUX Schnell)', 'home_fal'),
-        ('SHARED — pics, video, account', 'home_shared'),
+        ('PERCHANCE — free images', 'home_perchance', 'icon_perchance.png', 'Perchance generator · no credits'),
+        ('FAL — fast batch (FLUX Schnell)', 'home_fal', 'icon_fal.png', '10 princess presets · backend power'),
+        ('SHARED — pics, video, account', 'home_shared', 'icon_shared.png', 'Gallery · 480p animate · QR'),
     ]
     if not get_api_key():
-        sections.append(('Connect account (QR)', 'home_connect'))
-    for label, action in sections:
-        li = xbmcgui.ListItem(label)
-        li.setProperty('IsPlayable', 'false')
-        xbmcplugin.addDirectoryItem(HANDLE, f'plugin://{ADDON_ID}/?action={action}', li, True)
+        sections.append(('Connect account (QR)', 'home_connect', 'icon_connect.png', 'Link phone to this Fire Stick'))
+    for label, action, icon, plot in sections:
+        add_menu_item(label, action, icon, plot)
     xbmcplugin.endOfDirectory(HANDLE)
 
 

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<window type="dialog" id="12000">
+  <coordinates>
+    <system>1</system>
+  </coordinates>
+  <controls>
+    <control type="image" id="100">
+      <left>0</left>
+      <top>0</top>
+      <width>1920</width>
+      <height>1080</height>
+      <aspectratio>scale</aspectratio>
+      <texture />
+    </control>
+    <control type="image">
+      <left>0</left>
+      <top>0</top>
+      <width>1920</width>
+      <height>1080</height>
+      <aspectratio>scale</aspectratio>
+      <texture colordiffuse>CC0D0D1A</texture>
+    </control>
+    <control type="label" id="101">
+      <left>160</left>
+      <top>340</top>
+      <width>1600</width>
+      <height>90</height>
+      <font>font60_title</font>
+      <textcolor>FFF5C542</textcolor>
+      <shadowcolor>FF000000</shadowcolor>
+      <align>center</align>
+      <aligny>center</aligny>
+      <label>Generating…</label>
+    </control>
+    <control type="label" id="102">
+      <left>240</left>
+      <top>440</top>
+      <width>1440</width>
+      <height>120</height>
+      <font>font27</font>
+      <textcolor>FFC4B5FD</textcolor>
+      <shadowcolor>FF000000</shadowcolor>
+      <align>center</align>
+      <aligny>center</aligny>
+      <wrapmultiline>true</wrapmultiline>
+      <label />
+    </control>
+    <control type="progress" id="501">
+      <left>360</left>
+      <top>600</top>
+      <width>1200</width>
+      <height>28</height>
+      <texturebg border="3">dialogslider2.png</texturebg>
+      <midtexture border="3">dialogslider.png</midtexture>
+    </control>
+    <control type="label" id="103">
+      <left>360</left>
+      <top>640</top>
+      <width>1200</width>
+      <height>50</height>
+      <font>font12</font>
+      <textcolor>FF9B7BFF</textcolor>
+      <align>center</align>
+      <aligny>center</aligny>
+      <label>0%</label>
+    </control>
+  </controls>
+</window>
