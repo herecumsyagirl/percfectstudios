@@ -649,9 +649,41 @@ textarea.form-control { resize: vertical; min-height: 96px; }
       }
     } catch (e) { /* fall through to X compose */ }
 
-    const intent = 'https://x.com/intent/tweet?text=' + encodeURIComponent(tweetText)
-      + '&url=' + encodeURIComponent(mediaUrl);
+    // Desktop fallback: X can't attach media from a link (and the media URL is
+    // temporary), so get the actual file to the user — clipboard if the browser
+    // allows it, otherwise a download — then open the composer with text only.
+    let hint = 'Attach your saved file to the post.';
+    try {
+      const resp = await fetch('/share/fetch?url=' + encodeURIComponent(mediaUrl));
+      const blob = await resp.blob();
+      let copied = false;
+      if (type !== 'video' && navigator.clipboard && window.ClipboardItem) {
+        // Clipboard images must be PNG — redraw the JPEG through a canvas.
+        const png = await new Promise((res) => {
+          const im = new Image();
+          im.onload = () => { const cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight; cv.getContext('2d').drawImage(im, 0, 0); cv.toBlob(res, 'image/png'); };
+          im.onerror = () => res(null);
+          im.src = URL.createObjectURL(blob);
+        });
+        if (png) {
+          try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]); copied = true; } catch (_c) {}
+        }
+      }
+      if (copied) {
+        hint = 'Your image is copied — press Ctrl/Cmd + V in the post to attach it.';
+      } else {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'percfect-' + type + '.' + (type === 'video' ? 'mp4' : 'jpg');
+        document.body.appendChild(a); a.click(); a.remove();
+        hint = 'Your ' + (type === 'video' ? 'video' : 'image') + ' was downloaded — drag it into the post to attach it.';
+      }
+    } catch (_e) { /* keep default hint */ }
+
+    // Text only — no media URL, since the picture is now on the clipboard / downloaded.
+    const intent = 'https://x.com/intent/tweet?text=' + encodeURIComponent(tweetText);
     window.open(intent, '_blank', 'noopener,noreferrer,width=580,height=520');
+    alert(hint);
   }
 </script>
 
