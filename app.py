@@ -1765,14 +1765,29 @@ def character_finalize():
         return jsonify({"error": f"You need {extra_n} image credits to build the full character. Buy credits or redeem a coupon code."}), 402
 
     try:
-        # other 3 shots — back / left / right, image-edits of the approved front shot
-        images = [primary]
-        for _key, desc in CHARACTER_POSES[1:]:
-            try:
-                rr = generate_image_xai(pose_edit_prompt(desc), primary)
-                images.append(rr["data"][0]["url"])
-            except Exception:
-                pass
+        # other 3 shots — back / left / right, image-edits of the approved front shot.
+        # Generate them CONCURRENTLY: running these xAI edits one after another blew
+        # past the gunicorn worker timeout, so the worker was killed and every extra
+        # shot was lost (you'd get only the front shot). In parallel the request
+        # finishes in roughly the time of a single edit.
+        from concurrent.futures import ThreadPoolExecutor
+        extras = CHARACTER_POSES[1:]
+
+        def _make_shot(desc):
+            rr = generate_image_xai(pose_edit_prompt(desc), primary)
+            return rr["data"][0]["url"]
+
+        results = [None] * len(extras)
+        shot_errors = []
+        with ThreadPoolExecutor(max_workers=len(extras)) as ex:
+            futs = {ex.submit(_make_shot, desc): (i, key) for i, (key, desc) in enumerate(extras)}
+            for fut in futs:
+                i, key = futs[fut]
+                try:
+                    results[i] = fut.result()
+                except Exception as e:
+                    shot_errors.append(f"{key}: {e}")
+        images = [primary] + [r for r in results if r]
 
         if not current_user.is_admin:
             spent_img = len(images) - 1
@@ -1787,7 +1802,11 @@ def character_finalize():
             "spin_video_url": None, "prompt": prompt, "source_mode": source_mode,
         }).execute()
 
-        return jsonify({"ok": True, "character": _serialize_character(row.data[0]), "images": images})
+        resp = {"ok": True, "character": _serialize_character(row.data[0]), "images": images}
+        if shot_errors:
+            resp["warning"] = f"{len(shot_errors)} of {len(extras)} extra shots failed."
+            resp["shot_errors"] = shot_errors
+        return jsonify(resp)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
