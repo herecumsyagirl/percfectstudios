@@ -12,8 +12,16 @@ import datetime
 import requests
 import stripe
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageOps
 from dotenv import load_dotenv
+
+# Let Pillow decode iPhone HEIC/HEIF photos. Safe no-op if the package
+# is unavailable for some reason (we still handle JPEG/PNG/WebP natively).
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except Exception:
+    pass
 
 load_dotenv()
 
@@ -133,6 +141,24 @@ def _gender_word(gender: str) -> str:
     if g in ("female", "f", "woman", "girl"):
         return "female"
     return ""
+
+
+# The 4 profile shots, in order. Index 0 (front) is the approved shot; the rest are
+# image-edits of it so the character stays identical from every angle.
+CHARACTER_POSES = [
+    ("front", "full front view, facing the camera"),
+    ("back",  "full back view, turned around facing directly away from the camera, showing the back of the head and body"),
+    ("left",  "full left-side profile view"),
+    ("right", "full right-side profile view"),
+]
+
+
+def pose_edit_prompt(pose_desc: str) -> str:
+    return (
+        "Show the EXACT same character — identical face, hairstyle, outfit, colors and "
+        f"proportions — in a {pose_desc}. Full body, standing, plain white background, "
+        "clean high-quality 3D animated style, consistent lighting, no distortion."
+    )
 
 
 def build_character_prompt(description: str, gender: str, has_image: bool) -> str:
@@ -277,12 +303,31 @@ def reset_daily_if_needed(user_id):
 
 
 def _file_to_data_uri(file_storage):
+    """Normalize any uploaded photo to a JPEG data URI.
+
+    iPhones upload HEIC by default; older code just relabelled the MIME as
+    JPEG, so the API received HEIC bytes claiming to be JPEG and rejected
+    them. Here we actually decode the image (HEIC/PNG/WebP/etc.), fix EXIF
+    rotation, downscale very large photos, and re-encode as JPEG.
+    """
     data = file_storage.read()
-    mime = file_storage.mimetype or "image/jpeg"
-    if mime not in ("image/jpeg", "image/png", "image/webp", "image/gif"):
-        mime = "image/jpeg"
-    b64 = base64.b64encode(data).decode()
-    return f"data:{mime};base64,{b64}"
+    try:
+        img = Image.open(BytesIO(data))
+        # Respect the EXIF orientation iPhones write, then drop alpha.
+        img = ImageOps.exif_transpose(img).convert("RGB")
+        # Cap the long edge so a 12MP photo doesn't become a huge base64 blob.
+        img.thumbnail((1536, 1536), Image.LANCZOS)
+        out = BytesIO()
+        img.save(out, format="JPEG", quality=88, optimize=True)
+        b64 = base64.b64encode(out.getvalue()).decode()
+        return f"data:image/jpeg;base64,{b64}"
+    except Exception:
+        # Fall back to the raw bytes if decoding fails for any reason.
+        mime = file_storage.mimetype or "image/jpeg"
+        if mime not in ("image/jpeg", "image/png", "image/webp", "image/gif"):
+            mime = "image/jpeg"
+        b64 = base64.b64encode(data).decode()
+        return f"data:{mime};base64,{b64}"
 
 
 def _get_form_image_url():
@@ -1657,12 +1702,11 @@ def character_finalize():
         return jsonify({"error": f"You need {extra_n} image credits to build the full character. Buy credits or redeem a coupon code."}), 402
 
     try:
-        # 3 more shots — image-edits of the approved shot so they stay consistent
+        # other 3 shots — back / left / right, image-edits of the approved front shot
         images = [primary]
-        edit_prompt = prompt or CHARACTER_IMAGE_PROMPT
-        for _ in range(extra_n):
+        for _key, desc in CHARACTER_POSES[1:]:
             try:
-                rr = generate_image_xai(edit_prompt, primary)
+                rr = generate_image_xai(pose_edit_prompt(desc), primary)
                 images.append(rr["data"][0]["url"])
             except Exception:
                 pass
@@ -1681,6 +1725,65 @@ def character_finalize():
         }).execute()
 
         return jsonify({"ok": True, "character": _serialize_character(row.data[0]), "images": images})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/studios/percfectcharacter/refine", methods=["POST"])
+@login_required
+def character_refine():
+    """Fix one of the 4 profile shots from a text note (e.g. 'ponytail not hair down').
+    Edits just that pose; the frontend re-runs generate-spin afterward. Costs 1 image credit."""
+    reset_daily_if_needed(current_user.id)
+    res = supabase.table("users").select("picture_credits,images_today").eq("id", current_user.id).single().execute()
+    u = res.data
+
+    char_id = request.form.get("character_id", "").strip()
+    correction = request.form.get("correction", "").strip()
+    try:
+        slot = int(request.form.get("slot", "-1"))
+    except ValueError:
+        slot = -1
+    if not correction:
+        return jsonify({"error": "Describe what to change."}), 400
+
+    cres = supabase.table("characters").select("*").eq("id", char_id).eq("user_id", current_user.id).maybe_single().execute()
+    char = cres.data if cres else None
+    if not char:
+        return jsonify({"error": "Character not found."}), 404
+    images = char.get("images") or []
+    if slot < 0 or slot >= len(images):
+        return jsonify({"error": "Pick which photo to fix."}), 400
+
+    if not current_user.is_admin and u["picture_credits"] < 1:
+        return jsonify({"error": "You need 1 image credit. Buy credits or redeem a coupon code."}), 402
+
+    pose_desc = CHARACTER_POSES[slot][1] if slot < len(CHARACTER_POSES) else "full body view"
+    edit_prompt = (
+        f"{correction}. Keep the EXACT same character and the same {pose_desc}; apply only "
+        "this change, full body, plain white background, consistent face, outfit, colors and "
+        "proportions, clean 3D animated style."
+    )
+    try:
+        r = generate_image_xai(edit_prompt, images[slot])
+        images[slot] = r["data"][0]["url"]
+        if slot == 0:
+            primary = images[0]
+        else:
+            primary = char.get("primary_image_url")
+
+        if not current_user.is_admin:
+            supabase.table("users").update({
+                "picture_credits": max(0, u["picture_credits"] - 1),
+                "images_today": u["images_today"] + 1,
+            }).eq("id", current_user.id).execute()
+
+        supabase.table("characters").update({
+            "images": images, "primary_image_url": primary,
+            "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        }).eq("id", char_id).execute()
+
+        return jsonify({"ok": True, "images": images, "slot": slot})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

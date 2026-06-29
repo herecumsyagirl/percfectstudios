@@ -9,3 +9,4 @@ gunicorn==22.0.0
 whitenoise==6.7.0
 stripe==10.5.0
 pillow==10.4.0
+pillow-heif==0.18.0

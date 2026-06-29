@@ -67,7 +67,7 @@
       <!-- Step 2: review the single shot -->
       <div id="review-section" style="display:none">
         <div class="output-area" id="one-out" style="margin-top:1rem">
-          <div class="shimmer-overlay" id="one-shimmer"></div>
+          <div class="loading-overlay" id="one-loading"><div class="spinner"></div><p>Generating your character…<br><small>5–15 seconds</small></p></div>
           <img id="one-img" src="" alt="" />
         </div>
 
@@ -91,13 +91,38 @@
 
       <!-- Step 3: final result -->
       <div id="final-section" style="display:none">
-        <div class="approved-pill">✓ Character saved to your roster</div>
-        <p class="section-label" style="margin-bottom:.5rem">All 4 shots</p>
+        <div class="approved-pill">✓ Character built</div>
+        <p class="section-label" style="margin-bottom:.5rem">Front · Back · Left · Right</p>
         <div class="shots-grid" id="final-grid"></div>
         <p class="section-label" style="margin:1rem 0 .5rem">360° spin</p>
         <div class="output-area spin-out" id="final-spin-out" style="min-height:auto;">
-          <video id="final-spin" controls loop muted playsinline></video>
+          <div class="output-placeholder" id="final-spin-ph"><p class="ph-text">360° will appear here</p></div>
+          <video id="final-spin" controls loop muted playsinline style="display:none"></video>
         </div>
+
+        <!-- Looks good? -->
+        <div id="approval-row" class="mt-3" style="text-align:center">
+          <p style="font-weight:600;margin-bottom:.5rem;">Looks good?</p>
+          <div style="display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap">
+            <button class="btn-accent" onclick="saveAndDone()">✓ Yes, save and done</button>
+            <button class="btn-outline-accent" onclick="showRefine()">✕ Fix one of the photos</button>
+          </div>
+        </div>
+
+        <!-- Refine -->
+        <div id="refine-section" style="display:none" class="mt-3">
+          <p class="section-label">What's wrong with one of the photos?</p>
+          <label class="form-label">Pick which photo to fix</label>
+          <div class="shots-grid" id="refine-picker"></div>
+          <label class="form-label mt-2">Describe the change <span class="form-hint">e.g. "ponytail not hair down"</span></label>
+          <input class="form-control" id="refine-text" placeholder='e.g. "ponytail not hair down"' />
+          <div class="review-row">
+            <button class="btn-accent" style="flex:1" onclick="applyRefine()">Apply fix &amp; re-render 360° (1 image credit + 6 video sec)</button>
+            <button class="btn-outline-accent" onclick="hide('refine-section')">Cancel</button>
+          </div>
+          <div id="refine-err" class="gen-error" style="display:none"></div>
+        </div>
+
         <button class="btn-outline-accent w-100 mt-3" onclick="resetBuilder()">＋ Create another character</button>
         <a href="/studios/percfectcharacter/arena" class="btn-accent w-100 mt-2 d-block" style="text-align:center">⚔ Enter The Arena →</a>
       </div>
@@ -181,6 +206,13 @@
 .shimmer-overlay { display:none; position:absolute; inset:0; background:linear-gradient(90deg,transparent 0%,rgba(124,92,252,.08) 50%,transparent 100%); background-size:200% 100%; animation:shimmer 1.5s infinite; }
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
+.loading-overlay{ display:none; position:absolute; inset:0; background:rgba(13,13,24,.92); flex-direction:column; align-items:center; justify-content:center; color:var(--accent-3); text-align:center; gap:.85rem; z-index:5; backdrop-filter:blur(4px); }
+.loading-overlay.show{ display:flex; }
+.loading-overlay p{ margin:0; font-weight:700; font-size:1.05rem; }
+.loading-overlay small{ color:var(--text-muted); font-weight:500; font-size:.78rem; }
+.spinner{ width:48px; height:48px; border:4px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin{ to{transform:rotate(360deg);} }
+
 .shots-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.6rem; }
 .shot { aspect-ratio:1; border-radius:12px; overflow:hidden; border:1px solid var(--border); background:var(--bg-3); }
 .shot img { width:100%; height:100%; object-fit:cover; }
@@ -255,26 +287,33 @@ function loadFile(file){ if(!file.type.startsWith('image/')) return; state.file=
 
 /* ── Step 1: generate ONE shot ── */
 function generateOne(){ requireAuth(_generateOne); }
+function loudErr(id,msg){ err(id,msg); const e=document.getElementById(id); if(e) e.scrollIntoView({behavior:'smooth',block:'center'}); }
 async function _generateOne(){
-  if(!state.gender){ err('gen-err','Pick male or female first.'); return; }
+  if(!state.gender){ loudErr('gen-err','Pick male or female first.'); return; }
   const fd=new FormData();
   fd.append('gender',state.gender);
-  if(state.mode==='upload'){ if(!state.file){ err('gen-err','Upload a photo first.'); return; } fd.append('image_file',state.file); }
-  else { const d=document.getElementById('desc').value.trim(); if(!d){ err('gen-err','Describe your character first.'); return; } fd.append('description',d); }
+  if(state.mode==='upload'){ if(!state.file){ loudErr('gen-err','Upload a photo first.'); return; } fd.append('image_file',state.file); }
+  else { const d=document.getElementById('desc').value.trim(); if(!d){ loudErr('gen-err','Describe your character first.'); return; } fd.append('description',d); }
   hide('gen-err'); hide('review-err'); hide('final-section');
   setBtn('gen-btn',true);
   show('review-section');
-  document.getElementById('one-shimmer').style.display='block';
-  document.getElementById('one-img').style.opacity='.3';
+  const img=document.getElementById('one-img'); img.style.display='none'; img.src='';
+  document.getElementById('one-loading').classList.add('show');
+  document.getElementById('one-out').scrollIntoView({behavior:'smooth',block:'center'});
   try{
     const res=await fetch('/studios/percfectcharacter/generate-one',{method:'POST',body:fd});
-    const data=await res.json();
-    if(!res.ok){ err('gen-err',data.error||'Generation failed.'); hide('review-section'); return; }
+    let data; try { data = await res.json(); } catch(_e) { data = {}; }
+    if(!res.ok || !data.url){
+      const m = data.error || ('Generation failed (HTTP '+res.status+'). Please try again.');
+      loudErr('gen-err',m);
+      hide('review-section');
+      return;
+    }
     state.candidate=data.url; state.prompt=data.prompt;
-    const img=document.getElementById('one-img'); img.src=data.url; img.style.opacity='1';
+    img.src=data.url; img.style.display='block';
     adjCredit('img-credits',-1);
-  }catch(e){ err('gen-err','Network error — please try again.'); hide('review-section'); }
-  finally{ setBtn('gen-btn',false); document.getElementById('one-shimmer').style.display='none'; }
+  }catch(e){ loudErr('gen-err','Network error — please try again.'); hide('review-section'); }
+  finally{ setBtn('gen-btn',false); document.getElementById('one-loading').classList.remove('show'); }
 }
 
 /* ── Step 2: approve → build the other 3 + 360 ── */
@@ -285,7 +324,7 @@ async function _approveOne(){
   startFinProgress('Building the other 3 shots…');
 
   // Phase 1 — build the other 3 shots + save the character
-  let charId=null;
+  state.savedId=null;
   const fd=new FormData();
   fd.append('primary_image_url',state.candidate);
   fd.append('prompt',state.prompt||'');
@@ -294,29 +333,106 @@ async function _approveOne(){
   fd.append('source_mode',state.mode);
   try{
     const res=await fetch('/studios/percfectcharacter/finalize',{method:'POST',body:fd});
-    const data=await res.json();
-    if(!res.ok){ err('fin-err',data.error||'Build failed.'); stopFinProgress(); return; }
+    let data; try { data = await res.json(); } catch(_e) { data = {}; }
+    if(!res.ok){ loudErr('fin-err',data.error||('Build failed (HTTP '+res.status+').')); stopFinProgress(); return; }
     hide('review-section');
-    document.getElementById('final-grid').innerHTML=(data.images||[]).map(u=>`<div class="shot"><img src="${u}" alt=""></div>`).join('');
+    renderFinalShots(data.images||[]);
     show('final-section');
+    show('approval-row'); hide('refine-section');
+    document.getElementById('final-spin').style.display='none';
+    document.getElementById('final-spin').removeAttribute('src');
+    document.getElementById('final-spin-ph').style.display='';
+    show('final-section');
+    document.getElementById('final-section').scrollIntoView({behavior:'smooth',block:'start'});
     adjCredit('img-credits',-3);
-    charId=data.character.id;
+    state.savedId = data.character.id;
+    state.shots = data.images || [];
     loadRoster();
-  }catch(e){ err('fin-err','Network error — please try again.'); stopFinProgress(); return; }
+  }catch(e){ loudErr('fin-err','Network error — please try again.'); stopFinProgress(); return; }
 
   // Phase 2 — 360 spin (separate request so we stay under the proxy timeout)
   setFinLabel('Creating the 360° spin…');
   try{
-    const fd2=new FormData(); fd2.append('character_id',charId);
+    const fd2=new FormData(); fd2.append('character_id',state.savedId);
     const res2=await fetch('/studios/percfectcharacter/generate-spin',{method:'POST',body:fd2});
-    const d2=await res2.json();
+    let d2; try { d2 = await res2.json(); } catch(_e) { d2 = {}; }
     if(res2.ok && d2.url){
-      const v=document.getElementById('final-spin'); v.src=d2.url; v.play().catch(()=>{});
+      const v=document.getElementById('final-spin'); v.src=d2.url; v.style.display='block';
+      document.getElementById('final-spin-ph').style.display='none';
+      v.play().catch(()=>{});
       adjCredit('vid-credits',-6); loadRoster();
     } else {
-      err('fin-err',(d2.error||'The 360° spin failed — your character is saved.'));
+      loudErr('fin-err',(d2.error||'The 360° spin failed — your character is saved; use the 🎥 360° button in your roster to retry.'));
     }
-  }catch(e){ err('fin-err','The 360° spin timed out — your character is saved; you can retry from your roster.'); }
+  }catch(e){ loudErr('fin-err','The 360° spin timed out — your character is saved; you can retry from your roster.'); }
+  finally{ stopFinProgress(); }
+}
+
+const POSE_LABELS = ['Front','Back','Left side','Right side'];
+function renderFinalShots(images){
+  document.getElementById('final-grid').innerHTML = images.map((u,i)=>`
+    <div class="shot"><img src="${u}" alt="${POSE_LABELS[i]||''}"><div class="shot-label">${POSE_LABELS[i]||('Shot '+(i+1))}</div></div>`).join('');
+}
+
+/* ── Looks good? / Refine ── */
+function saveAndDone(){
+  hide('approval-row');
+  document.getElementById('final-section').scrollIntoView({behavior:'smooth',block:'end'});
+}
+function showRefine(){
+  if(!state.savedId){ return; }
+  show('refine-section');
+  document.getElementById('refine-text').value='';
+  hide('refine-err');
+  // build the picker (4 thumbnails — click to choose which to fix)
+  state.refineSlot = 1; // default to back (the one most often wrong, like the user said)
+  const picker = document.getElementById('refine-picker');
+  picker.innerHTML = state.shots.map((u,i)=>`
+    <div class="shot ${i===state.refineSlot?'primary':''}" id="rpick-${i}" onclick="pickRefine(${i})">
+      <img src="${u}" alt=""><span class="pick">${POSE_LABELS[i]||'#'+(i+1)}</span>
+    </div>`).join('');
+  document.getElementById('refine-section').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function pickRefine(i){
+  state.refineSlot = i;
+  state.shots.forEach((_,k)=>{ const e=document.getElementById('rpick-'+k); if(e) e.classList.toggle('primary', k===i); });
+}
+async function applyRefine(){
+  const correction = document.getElementById('refine-text').value.trim();
+  if(!correction){ loudErr('refine-err','Describe the change first.'); return; }
+  if(state.refineSlot==null || !state.savedId){ loudErr('refine-err','Pick which photo to fix.'); return; }
+  hide('refine-err');
+  startFinProgress('Applying the fix to shot '+(state.refineSlot+1)+'…');
+  try{
+    const fd=new FormData();
+    fd.append('character_id',state.savedId);
+    fd.append('slot',state.refineSlot);
+    fd.append('correction',correction);
+    const res=await fetch('/studios/percfectcharacter/refine',{method:'POST',body:fd});
+    let data; try { data = await res.json(); } catch(_e) { data = {}; }
+    if(!res.ok){ loudErr('refine-err',data.error||'Refine failed.'); stopFinProgress(); return; }
+    state.shots = data.images;
+    renderFinalShots(state.shots);
+    adjCredit('img-credits',-1);
+    // re-run 360 from the (possibly updated) primary shot
+    setFinLabel('Re-rendering the 360° spin…');
+    document.getElementById('final-spin').style.display='none';
+    document.getElementById('final-spin').removeAttribute('src');
+    document.getElementById('final-spin-ph').style.display='';
+    const fd2=new FormData(); fd2.append('character_id',state.savedId);
+    const res2=await fetch('/studios/percfectcharacter/generate-spin',{method:'POST',body:fd2});
+    let d2; try { d2 = await res2.json(); } catch(_e) { d2 = {}; }
+    if(res2.ok && d2.url){
+      const v=document.getElementById('final-spin'); v.src=d2.url; v.style.display='block';
+      document.getElementById('final-spin-ph').style.display='none';
+      v.play().catch(()=>{});
+      adjCredit('vid-credits',-6);
+      hide('refine-section'); show('approval-row');
+    } else {
+      loudErr('refine-err',(d2.error||'The 360° re-render failed — your photo was updated; use the 🎥 360° button in your roster to retry.'));
+    }
+    loadRoster();
+  }catch(e){ loudErr('refine-err','Network error — please try again.'); }
   finally{ stopFinProgress(); }
 }
 function setFinLabel(t){ const e=document.getElementById('fin-label'); if(e) e.textContent=t; }
