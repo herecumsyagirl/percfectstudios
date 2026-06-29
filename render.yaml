@@ -9,6 +9,8 @@ services:
         generateValue: true
       - key: XAI_API_KEY
         sync: false
+      - key: FAL_KEY
+        sync: false
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY

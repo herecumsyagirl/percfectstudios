@@ -47,6 +47,8 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # ── xAI ───────────────────────────────────────────────────
 XAI_API_KEY = os.getenv("XAI_API_KEY")
 XAI_BASE_URL = "https://api.x.ai/v1"
+FAL_KEY = os.getenv("FAL_KEY")
+FAL_MODEL = "fal-ai/flux/schnell"
 
 # ── Stripe ────────────────────────────────────────────────
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
@@ -361,6 +363,52 @@ def generate_image_xai(prompt: str, image_url: str = None, n: int = 1) -> dict:
     if not resp.ok:
         raise Exception(f"xAI image error {resp.status_code}: {resp.text}")
     return resp.json()
+
+
+def generate_image_fal(prompt: str, num_images: int = 10) -> list:
+    """Generate images via fal.ai FLUX Schnell. Returns list of image URLs."""
+    if not FAL_KEY:
+        raise Exception("FAL_KEY not configured on server")
+    num_images = max(1, min(10, int(num_images)))
+    headers = {"Authorization": f"Key {FAL_KEY}", "Content-Type": "application/json"}
+    payload = {
+        "prompt": prompt,
+        "num_images": num_images,
+        "image_size": "square",
+        "num_inference_steps": 4,
+        "enable_safety_checker": False,
+        "output_format": "jpeg",
+    }
+
+    resp = requests.post(f"https://queue.fal.run/{FAL_MODEL}", json=payload, headers=headers, timeout=30)
+    if not resp.ok:
+        raise Exception(f"fal submit error {resp.status_code}: {resp.text}")
+
+    job = resp.json()
+    request_id = job.get("request_id")
+    if not request_id:
+        images = job.get("images") or []
+        return [img["url"] for img in images if img.get("url")]
+
+    import time
+    status_url = f"https://queue.fal.run/{FAL_MODEL}/requests/{request_id}/status"
+    result_url = f"https://queue.fal.run/{FAL_MODEL}/requests/{request_id}"
+    for _ in range(90):
+        time.sleep(2)
+        st = requests.get(status_url, headers=headers, timeout=30)
+        if not st.ok:
+            continue
+        status = st.json().get("status")
+        if status == "COMPLETED":
+            result = requests.get(result_url, headers=headers, timeout=60)
+            if not result.ok:
+                raise Exception(f"fal result error {result.status_code}: {result.text}")
+            data = result.json()
+            images = data.get("images") or (data.get("response") or {}).get("images") or []
+            return [img["url"] for img in images if img.get("url")]
+        if status in ("FAILED", "CANCELLED"):
+            raise Exception(f"fal generation {status.lower()}")
+    raise Exception("fal generation timed out")
 
 
 def generate_video_xai(prompt: str, image_url: str = None, duration: int = 6) -> dict:
@@ -1278,10 +1326,25 @@ def require_api_key(f):
 @app.route("/api/generate/image", methods=["POST"])
 @require_api_key
 def api_generate_image():
-    return jsonify({
-        "error": "Images are free via Perchance. Open percfectai.com/app → MAKE tab.",
-        "redirect": "https://percfectai.com/app",
-    }), 410
+    body = request.get_json(silent=True) or {}
+    prompt = body.get("prompt", "").strip()
+    num_images = int(body.get("num_images", 10))
+    if not prompt:
+        return jsonify({"error": "prompt is required"}), 400
+    try:
+        urls = generate_image_fal(prompt, num_images)
+        if not urls:
+            return jsonify({"error": "No images returned from fal"}), 500
+        user = g.api_user
+        for url in urls:
+            supabase.table("generations").insert({
+                "user_id": user["id"], "type": "image",
+                "prompt": prompt, "output_url": url,
+                "created_at": datetime.datetime.utcnow().isoformat(),
+            }).execute()
+        return jsonify({"urls": urls, "url": urls[0], "type": "image"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/generate/video", methods=["POST"])
