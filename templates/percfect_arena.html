@@ -39,6 +39,28 @@
   </div>
 </div>
 
+<div class="container mb-4">
+  <p class="section-label">3 · Choose a background <span style="font-weight:400;color:var(--text-muted)">(optional)</span></p>
+  <div class="bg-modes">
+    <button class="bg-mode selected" id="bgm-none"   onclick="setBgMode('none')">None</button>
+    <button class="bg-mode"          id="bgm-preset" onclick="setBgMode('preset')">Preset</button>
+    <button class="bg-mode"          id="bgm-text"   onclick="setBgMode('text')">Describe</button>
+    <button class="bg-mode"          id="bgm-upload" onclick="setBgMode('upload')">Upload</button>
+  </div>
+  <div id="bg-preset-wrap" class="bg-input" style="display:none">
+    <select id="bg-preset" class="form-control">
+      {% for b in backgrounds %}<option value="{{ b.key }}">{{ b.label }}</option>{% endfor %}
+    </select>
+  </div>
+  <div id="bg-text-wrap" class="bg-input" style="display:none">
+    <input id="bg-text" class="form-control" maxlength="200" placeholder='Describe the scene, e.g. "on a rooftop at night in the rain"' />
+  </div>
+  <div id="bg-upload-wrap" class="bg-input" style="display:none">
+    <input id="bg-file" type="file" accept="image/*" class="form-control" onchange="bgFilePicked(this)" />
+    <p class="credit-note" id="bg-file-name" style="display:none"></p>
+  </div>
+</div>
+
 <div class="container mb-6">
   <button class="generate-btn generate-btn-video" id="arena-btn" onclick="generateArena()" disabled>
     <span class="btn-text">▶ Generate interaction</span>
@@ -97,6 +119,11 @@
 .action-chip:hover { border-color:var(--accent); transform:translateY(-2px); }
 .action-chip.selected { border-color:var(--accent); background:var(--accent); color:#fff; }
 .action-emoji { font-size:1.5rem; }
+.bg-modes { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.6rem; }
+.bg-mode { padding:.5rem 1rem; border-radius:99px; border:1px solid var(--border-2); background:var(--bg-3); color:var(--text); font-size:.85rem; font-weight:600; cursor:pointer; transition:all .15s; }
+.bg-mode:hover { border-color:var(--accent); }
+.bg-mode.selected { border-color:var(--accent); background:var(--accent); color:#fff; }
+.bg-input { margin-top:.2rem; }
 
 .generate-btn { width:100%; padding:.75rem; border-radius:14px; border:none; cursor:pointer; background:linear-gradient(135deg,#3d6ee8,#2a4fcf); color:#fff; font-size:1rem; font-weight:700; font-family:var(--font-main); transition:all .2s; margin-bottom:.5rem; box-shadow:0 4px 24px rgba(61,110,232,.3); }
 .generate-btn:hover { transform:translateY(-2px); box-shadow:0 8px 32px rgba(61,110,232,.45); }
@@ -188,6 +215,19 @@ function updateCost(){
     : `${cost} video seconds`;
 }
 
+let bgMode='none', bgFile=null;
+function setBgMode(m){
+  bgMode=m;
+  ['none','preset','text','upload'].forEach(k=>{
+    document.getElementById('bgm-'+k).classList.toggle('selected',k===m);
+    const w=document.getElementById('bg-'+k+'-wrap'); if(w) w.style.display=(k===m?'block':'none');
+  });
+}
+function bgFilePicked(input){
+  bgFile=(input.files&&input.files[0])||null;
+  const n=document.getElementById('bg-file-name');
+  if(bgFile){ n.textContent='✓ '+bgFile.name; n.style.display='block'; } else { n.style.display='none'; }
+}
 function generateArena(){
   if(LOGGED_IN){ _generateArena(); }
   else { openAuthModal('signup'); }
@@ -205,6 +245,10 @@ async function _generateArena(){
   const fd=new FormData();
   fd.append('character_ids',selected.join(','));
   fd.append('action',selectedAction);
+  fd.append('bg_mode',bgMode);
+  if(bgMode==='preset'){ fd.append('bg_preset',document.getElementById('bg-preset').value); }
+  else if(bgMode==='text'){ fd.append('bg_text',document.getElementById('bg-text').value.trim()); }
+  else if(bgMode==='upload'){ if(bgFile) fd.append('bg_file',bgFile); }
   try{
     const res=await fetch('/studios/percfectcharacter/arena/generate',{method:'POST',body:fd});
     const data=await res.json();

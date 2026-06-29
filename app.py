@@ -114,11 +114,26 @@ CHARACTER_SPIN_PROMPT = (
 # Two-character action videos. Each uses both approved character images (composited
 # side-by-side into one frame) plus the action prompt below, sent to the video generator.
 _ACTION_BASE = (
-    "The two characters from the image come together in a single shared scene on a clean "
-    "background. {action} Smooth cinematic animation, fluid natural motion, keep each "
+    "The characters from the image come together in a single shared scene {bg}. "
+    "{action} Smooth cinematic animation, fluid natural motion, keep each "
     "character perfectly consistent in face, body, clothing and proportions, high quality "
     "3D animated style."
 )
+
+# Arena background presets shown in the dropdown. `scene` is woven into the video
+# prompt. Drop a matching image at static/backgrounds/<key>.jpg to turn any preset
+# into a real backdrop the characters get composited onto (auto-detected at runtime).
+ARENA_BACKGROUNDS = [
+    {"key": "studio", "label": "Clean Studio",     "scene": "in a clean, softly lit photo studio"},
+    {"key": "arena",  "label": "Battle Arena",      "scene": "in a grand battle arena with a cheering crowd"},
+    {"key": "throne", "label": "Throne Room",       "scene": "in an ornate royal throne room with banners and golden pillars"},
+    {"key": "neon",   "label": "Neon City",         "scene": "on a futuristic neon-lit city street at night"},
+    {"key": "forest", "label": "Enchanted Forest",  "scene": "in a lush enchanted forest with sunbeams through the trees"},
+    {"key": "beach",  "label": "Beach Sunset",      "scene": "on a tropical beach at golden-hour sunset"},
+    {"key": "space",  "label": "Outer Space",       "scene": "in deep outer space among stars and distant nebulae"},
+    {"key": "ring",   "label": "Boxing Ring",       "scene": "in a professional boxing ring under bright spotlights"},
+]
+ARENA_BG_BY_KEY = {b["key"]: b for b in ARENA_BACKGROUNDS}
 CHARACTER_ACTIONS = {
     "fight":    {"label": "Fight",      "emoji": "🥊", "action": "They engage in an energetic, dynamic martial-arts fight with dodging, striking and acrobatic action poses."},
     "romance":  {"label": "Romance",    "emoji": "💕", "action": "They share a tender romantic moment, drawing close and gazing at each other with gentle affectionate movement."},
@@ -129,11 +144,12 @@ CHARACTER_ACTIONS = {
 }
 
 
-def character_action_prompt(action_key: str) -> str:
+def character_action_prompt(action_key: str, scene: str = None) -> str:
     act = CHARACTER_ACTIONS.get(action_key)
     if not act:
         return ""
-    return _ACTION_BASE.format(action=act["action"])
+    bg = scene.strip() if scene and scene.strip() else "on a clean background"
+    return _ACTION_BASE.format(action=act["action"], bg=bg)
 
 
 def _gender_word(gender: str) -> str:
@@ -219,6 +235,65 @@ def composite_characters(urls: list) -> str:
 
 def composite_two_characters(url_a: str, url_b: str) -> str:
     return composite_characters([url_a, url_b])
+
+
+def _key_out_white(im: Image.Image, thresh: int = 32) -> Image.Image:
+    """Make the border-connected near-white background transparent via flood-fill from
+    the four corners. Interior white (e.g. white clothing) is preserved, so a character
+    on a white card can be dropped onto a scene without an ugly white box."""
+    from PIL import ImageDraw
+    im = im.convert("RGBA")
+    rgb = im.convert("RGB")
+    SENT = (0, 255, 1)  # sentinel colour unlikely to occur in the art
+    for corner in [(0, 0), (im.width - 1, 0), (0, im.height - 1), (im.width - 1, im.height - 1)]:
+        try:
+            ImageDraw.floodfill(rgb, corner, SENT, thresh=thresh)
+        except Exception:
+            pass
+    pr, px = rgb.load(), im.load()
+    for y in range(im.height):
+        for x in range(im.width):
+            if pr[x, y] == SENT:
+                r, g, b, _ = px[x, y]
+                px[x, y] = (r, g, b, 0)
+    return im
+
+
+def _fit_cover(im: Image.Image, w: int, h: int) -> Image.Image:
+    """Resize + center-crop an image to exactly cover w×h (like CSS background-size:cover)."""
+    im = im.convert("RGBA")
+    scale = max(w / im.width, h / im.height)
+    im = im.resize((max(1, int(im.width * scale)), max(1, int(im.height * scale))), Image.LANCZOS)
+    x = (im.width - w) // 2
+    y = (im.height - h) // 2
+    return im.crop((x, y, x + w, y + h))
+
+
+def composite_on_background(char_urls: list, bg_image: Image.Image) -> str:
+    """Place the characters (white background keyed out) onto a scene image, standing
+    side-by-side along the bottom, and return a data URI for the video generator."""
+    W, H = 1024, 576
+    canvas = _fit_cover(bg_image, W, H)
+    char_h = int(H * 0.86)
+    cut = []
+    for u in char_urls:
+        if not u:
+            continue
+        keyed = _key_out_white(_load_image_any(u))
+        w = max(1, int(keyed.width * char_h / keyed.height))
+        cut.append(keyed.resize((w, char_h), Image.LANCZOS))
+    if not cut:
+        raise ValueError("No images to composite.")
+    gap = 24
+    total_w = sum(c.width for c in cut) + gap * (len(cut) - 1)
+    x = (W - total_w) // 2
+    y = H - char_h
+    for c in cut:
+        canvas.alpha_composite(c, (max(0, x), y))
+        x += c.width + gap
+    buf = BytesIO()
+    canvas.convert("RGB").save(buf, format="JPEG", quality=90)
+    return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
 def generate_character_shots(prompt: str, image_url: str = None, count: int = 4) -> list:
@@ -2025,7 +2100,7 @@ def percfect_arena():
             "picture_credits,video_credits,has_purchased"
         ).eq("id", current_user.id).single().execute()
         user_data = res.data
-    return render_template("percfect_arena.html", user=user_data, actions=CHARACTER_ACTIONS)
+    return render_template("percfect_arena.html", user=user_data, actions=CHARACTER_ACTIONS, backgrounds=ARENA_BACKGROUNDS)
 
 
 @app.route("/studios/percfectcharacter/arena/generate", methods=["POST"])
@@ -2042,7 +2117,33 @@ def arena_generate():
     if len(ids) > 3:
         return jsonify({"error": "The Arena supports up to 3 characters."}), 400
 
-    prompt = character_action_prompt(action)
+    # Background: dropdown preset, free-text scene, or an uploaded image. Image-backed
+    # backgrounds (uploads, or presets with a static/backgrounds/<key>.jpg) get the
+    # characters composited onto them; text/preset scenes are woven into the prompt.
+    bg_mode = request.form.get("bg_mode", "none")
+    scene = None
+    bg_image = None
+    if bg_mode == "preset":
+        preset = ARENA_BG_BY_KEY.get(request.form.get("bg_preset", ""))
+        if preset:
+            scene = preset.get("scene")
+            img_path = os.path.join(app.static_folder, "backgrounds", f"{preset['key']}.jpg")
+            if os.path.exists(img_path):
+                try:
+                    bg_image = Image.open(img_path)
+                except Exception:
+                    bg_image = None
+    elif bg_mode == "text":
+        scene = request.form.get("bg_text", "").strip() or None
+    elif bg_mode == "upload":
+        f = request.files.get("bg_file")
+        if f and f.filename:
+            try:
+                bg_image = _load_image_any(_file_to_data_uri(f))
+            except Exception:
+                return jsonify({"error": "Couldn't read that background image."}), 400
+
+    prompt = character_action_prompt(action, scene)
     if not prompt:
         return jsonify({"error": "Pick an interaction."}), 400
 
@@ -2057,7 +2158,8 @@ def arena_generate():
         return jsonify({"error": "One or more characters could not be loaded."}), 400
 
     try:
-        composite = composite_characters(primaries)
+        composite = composite_on_background(primaries, bg_image) if bg_image is not None \
+            else composite_characters(primaries)
         result = generate_video_xai(prompt, composite, duration)
         video_url = (result.get("video") or {}).get("url") \
             or result.get("url") \
