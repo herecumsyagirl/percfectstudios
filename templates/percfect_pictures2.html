@@ -3,101 +3,70 @@
 
 {% block content %}
 <style>
-  .pp2-wrap { max-width: 1400px; margin: 0 auto; padding: 1rem 1rem 3rem; }
+  .pp2-wrap { max-width: 900px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
 
-  .pp2-hero { text-align: center; margin-bottom: 1rem; }
+  .pp2-hero { text-align: center; margin-bottom: 1.5rem; }
   .pp2-hero h1 {
     font-size: 2rem; font-weight: 800;
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    background-clip: text; margin-bottom: 0.25rem;
+    background-clip: text; margin-bottom: 0.35rem;
   }
-  .pp2-hero p { color: var(--text-muted); font-size: 0.85rem; margin: 0; }
+  .pp2-steps {
+    display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap;
+    font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;
+  }
+  .pp2-step { background: var(--bg-3); border: 1px solid var(--border-2); border-radius: 999px; padding: 0.25rem 0.65rem; }
+  .pp2-step strong { color: var(--accent-2); }
 
-  .pp2-layout {
-    display: grid;
-    grid-template-columns: 1fr 340px;
-    gap: 1rem;
-    min-height: 70vh;
-  }
-  @media (max-width: 960px) {
-    .pp2-layout { grid-template-columns: 1fr; }
-  }
-
-  .pp2-gen-panel {
+  .pp2-panel {
     background: var(--bg-2); border: 1px solid var(--border-2);
-    border-radius: 16px; overflow: hidden; display: flex; flex-direction: column;
+    border-radius: 16px; padding: 1rem; margin-bottom: 1rem;
   }
-  .pp2-gen-label {
-    padding: 0.6rem 1rem; font-size: 0.8rem; font-weight: 600;
-    border-bottom: 1px solid var(--border-2); color: var(--text-muted);
-  }
-  .pp2-iframe {
-    flex: 1; width: 100%; min-height: 620px; border: none; background: #111;
-  }
-
-  .pp2-paywall {
-    background: var(--bg-2); border: 1px solid var(--border-2);
-    border-radius: 16px; display: flex; flex-direction: column;
-    max-height: 80vh;
-  }
-  .pp2-paywall-head {
-    padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-2);
-    font-size: 0.85rem; font-weight: 700;
-  }
-  .pp2-credits { font-size: 0.75rem; color: var(--accent); font-weight: 700; }
-  .pp2-controls {
-    display: flex; flex-direction: column; gap: 0.5rem;
-    padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-2);
-  }
+  .pp2-controls { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: stretch; }
   .pp2-select {
-    width: 100%; padding: 0.55rem 0.65rem; border-radius: 10px;
+    flex: 1; min-width: 160px; padding: 0.7rem 0.75rem; border-radius: 10px;
     border: 1px solid var(--border-2); background: var(--bg-3);
-    color: var(--text); font-size: 0.85rem;
+    color: var(--text); font-size: 0.95rem;
   }
   .pp2-generate-btn {
-    width: 100%; padding: 0.65rem 1rem; border: none; border-radius: 10px;
+    padding: 0.7rem 1.25rem; border: none; border-radius: 10px;
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    color: #fff; font-size: 0.85rem; font-weight: 800; cursor: pointer;
+    color: #fff; font-size: 0.95rem; font-weight: 800; cursor: pointer; white-space: nowrap;
   }
   .pp2-generate-btn:disabled { opacity: 0.55; cursor: wait; }
-  .pp2-paywall-scroll { overflow-y: auto; padding: 0.75rem; flex: 1; }
+  .pp2-meta { margin-top: 0.6rem; font-size: 0.78rem; color: var(--text-muted); display: flex; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+  .pp2-credits { color: var(--accent); font-weight: 700; }
 
-  .pp2-grid { display: flex; flex-direction: column; gap: 0.75rem; }
-
-  .pp2-card {
-    background: var(--bg-3); border: 1px solid var(--border-2);
-    border-radius: 12px; overflow: hidden; position: relative;
-  }
-  .pp2-card img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
-  .pp2-unlock-overlay {
-    position: absolute; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 0.4rem;
-    background: rgba(0,0,0,0.35);
-  }
-  .pp2-unlock-btn {
-    background: var(--accent); color: #fff; border: none; border-radius: 10px;
-    padding: 0.45rem 0.9rem; font-size: 0.75rem; font-weight: 700; cursor: pointer;
-  }
-  .pp2-unlock-label { font-size: 0.65rem; color: rgba(255,255,255,0.7); }
-  .pp2-dl { display: block; text-align: center; padding: 0.4rem; font-size: 0.7rem;
-    color: var(--accent-2); text-decoration: none; }
-
-  .pp2-empty { text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 2rem 0.5rem; }
-  .pp2-notice {
-    margin-top: 0.75rem; font-size: 0.78rem; color: var(--text-muted); text-align: center;
-  }
   .pp2-error {
     background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
-    color: #f87171; border-radius: 10px; padding: 0.5rem 0.75rem;
-    margin: 0.75rem 0; font-size: 0.8rem; display: none;
+    color: #f87171; border-radius: 10px; padding: 0.6rem 0.85rem;
+    margin-bottom: 1rem; font-size: 0.85rem; display: none;
   }
-  .pp2-status {
-    font-size: 0.75rem; color: var(--text-muted); padding: 0.5rem 1rem;
-    border-top: 1px solid var(--border-2); display: none;
+  .pp2-status { font-size: 0.82rem; color: var(--text-muted); text-align: center; margin-bottom: 1rem; display: none; }
+
+  .pp2-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.85rem;
   }
+  .pp2-card {
+    background: var(--bg-2); border: 1px solid var(--border-2);
+    border-radius: 12px; overflow: hidden;
+  }
+  .pp2-card img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+  .pp2-card-foot { padding: 0.55rem; display: flex; flex-direction: column; gap: 0.35rem; }
+  .pp2-dl-btn {
+    width: 100%; padding: 0.5rem; border: none; border-radius: 8px;
+    background: var(--accent); color: #fff; font-size: 0.78rem; font-weight: 700; cursor: pointer;
+  }
+  .pp2-dl-btn:disabled { opacity: 0.5; cursor: wait; }
+  .pp2-dl-btn.done { background: var(--bg-3); color: var(--accent-2); border: 1px solid var(--border-2); }
+  .pp2-dl-hint { font-size: 0.65rem; color: var(--text-muted); text-align: center; }
+
+  .pp2-empty { grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 3rem 1rem; }
   .pp2-skeleton .pp2-skel-img {
-    width: 100%; aspect-ratio: 1; background: linear-gradient(90deg, var(--bg-3) 25%, var(--bg-2) 50%, var(--bg-3) 75%);
+    width: 100%; aspect-ratio: 1;
+    background: linear-gradient(90deg, var(--bg-3) 25%, var(--bg-2) 50%, var(--bg-3) 75%);
     background-size: 200% 100%; animation: pp2-shimmer 1.2s infinite;
   }
   @keyframes pp2-shimmer {
@@ -109,68 +78,45 @@
 <div class="pp2-wrap">
   <div class="pp2-hero">
     <h1>👑 Perfect Princess Generator</h1>
-    <p>Pick a princess, hit Generate — 6 blurred previews appear free. Unlock full quality with 1 credit each.</p>
+    <div class="pp2-steps">
+      <span class="pp2-step"><strong>1</strong> Select</span>
+      <span class="pp2-step"><strong>2</strong> Generate</span>
+      <span class="pp2-step"><strong>3</strong> Download</span>
+    </div>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin:0">Images are hosted on percfectai.com — not external sites.</p>
   </div>
 
   <div class="pp2-error" id="pp2-error"></div>
+  <div class="pp2-status" id="pp2-status"></div>
 
-  <div class="pp2-layout">
-    <div class="pp2-gen-panel">
-      <div class="pp2-gen-label">✦ Percfect Princess Studio</div>
-      <iframe
-        id="pp2-studio"
-        class="pp2-iframe"
-        src="/studios/princess-engine"
-        title="Percfect Princess Studio"
-        allow="fullscreen"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads allow-modals"
-      ></iframe>
+  <div class="pp2-panel">
+    <div class="pp2-controls">
+      <select id="pp2-princess" class="pp2-select" aria-label="Choose princess">
+        {% for name in princess_keys %}
+        <option value="{{ name }}"{% if name == 'Jasmine' %} selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+      <button id="pp2-generate-btn" class="pp2-generate-btn" type="button">Generate</button>
     </div>
-
-    <div class="pp2-paywall">
-      <div class="pp2-paywall-head">
-        🔒 Your Previews
-        {% if current_user.is_authenticated %}
-        <span class="pp2-credits" id="pp2-credit-count">
-          {{ user.picture_credits if user and user.picture_credits is defined else (current_user.picture_credits or 0) }} credits
-        </span>
-        {% endif %}
-      </div>
-
-      <div class="pp2-controls">
-        <select id="pp2-princess" class="pp2-select">
-          {% for name in princess_keys %}
-          <option value="{{ name }}"{% if name == 'Jasmine' %} selected{% endif %}>{{ name }}</option>
-          {% endfor %}
-        </select>
-        <button id="pp2-generate-btn" class="pp2-generate-btn" type="button">
-          ✨ Generate 6 Previews
-        </button>
-      </div>
-
-      <div class="pp2-paywall-scroll">
-        <div class="pp2-grid" id="pp2-grid">
-          <div class="pp2-empty" id="pp2-empty">
-            {% if current_user.is_authenticated %}
-            Choose a princess above and tap Generate
-            {% else %}
-            <a href="/login?next=/percfectpictures2.0">Log in</a> to generate previews
-            {% endif %}
-          </div>
-        </div>
-      </div>
-      <div class="pp2-status" id="pp2-status"></div>
+    <div class="pp2-meta">
+      <span>6 images per generate · previews free · full download 1 credit each</span>
+      {% if current_user.is_authenticated %}
+      <span class="pp2-credits" id="pp2-credit-count">{{ user.picture_credits if user and user.picture_credits is defined else (current_user.picture_credits or 0) }} credits</span>
+      {% else %}
+      <span><a href="/login?next=/percfectpictures2.0">Log in</a> to generate</span>
+      {% endif %}
     </div>
   </div>
 
-  <p class="pp2-notice">
-    Preview is free. Full-quality unlock costs 1 credit per image.
-    {% if not current_user.is_authenticated %}
-    <a href="/login?next=/percfectpictures2.0">Log in</a> to save &amp; unlock.
-    {% else %}
-    <a href="/buy-credits">Buy credits</a>
-    {% endif %}
-  </p>
+  <div class="pp2-grid" id="pp2-grid">
+    <div class="pp2-empty" id="pp2-empty">
+      {% if current_user.is_authenticated %}
+      Your hosted images will appear here after you hit Generate.
+      {% else %}
+      <a href="/login?next=/percfectpictures2.0">Log in</a> then select a princess and hit Generate.
+      {% endif %}
+    </div>
+  </div>
 </div>
 
 <script>
@@ -201,7 +147,7 @@
     for (let i = 0; i < n; i++) {
       const sk = document.createElement('div');
       sk.className = 'pp2-card pp2-skeleton';
-      sk.innerHTML = '<div class="pp2-skel-img"></div>';
+      sk.innerHTML = '<div class="pp2-skel-img"></div><div class="pp2-card-foot"><span class="pp2-dl-hint">Generating…</span></div>';
       grid.appendChild(sk);
     }
   }
@@ -210,18 +156,17 @@
     document.querySelectorAll('.pp2-skeleton').forEach(el => el.remove());
   }
 
-  function pp2RenderPreview(previewUrl, genId) {
+  function pp2RenderCard(previewUrl, genId) {
     pp2ClearEmpty();
-    pp2RemoveSkeletons();
     const grid = document.getElementById('pp2-grid');
     const card = document.createElement('div');
     card.className = 'pp2-card';
     card.dataset.genId = genId;
     card.innerHTML = `
       <img src="${previewUrl}" alt="Preview" loading="lazy">
-      <div class="pp2-unlock-overlay">
-        <button class="pp2-unlock-btn" onclick="pp2Unlock('${genId}', this)">🔓 Unlock — 1 Credit</button>
-        <span class="pp2-unlock-label">Full quality · PERCFECT™</span>
+      <div class="pp2-card-foot">
+        <button type="button" class="pp2-dl-btn" onclick="pp2Download('${genId}', this)">⬇ Download Full Image</button>
+        <span class="pp2-dl-hint">1 credit · hosted on percfectai.com</span>
       </div>`;
     grid.prepend(card);
   }
@@ -234,89 +179,65 @@
     throw new Error(`Server error (${res.status})`);
   }
 
-  async function pp2BackendGenerate(princess) {
+  async function pp2Generate() {
     if (!pp2LoggedIn) {
-      pp2ShowError('Log in to generate. <a href="/login?next=/percfectpictures2.0" style="color:#c4b5fd">Log in →</a>');
+      pp2ShowError('Log in first. <a href="/login?next=/percfectpictures2.0" style="color:#c4b5fd">Log in →</a>');
       return;
     }
     if (pp2Busy) return;
     pp2Busy = true;
 
     const btn = document.getElementById('pp2-generate-btn');
+    const princess = document.getElementById('pp2-princess').value;
     btn.disabled = true;
     pp2HideError();
     pp2ShowSkeletons(6);
-    pp2SetStatus(true, '⏳ Generating 6 previews… (~1–2 min)');
+    pp2SetStatus(true, 'Generating 6 images and hosting on percfectai.com… (~1–2 min)');
 
     try {
       const fd = new FormData();
-      fd.append('princess', princess || document.getElementById('pp2-princess').value || 'Jasmine');
+      fd.append('princess', princess);
       fd.append('count', '6');
 
       const res = await fetch('/percfectstudios/perchance-generate', {
-        method: 'POST',
-        body: fd,
-        credentials: 'same-origin',
+        method: 'POST', body: fd, credentials: 'same-origin',
       });
       const data = await pp2ParseJson(res);
-
-      if (!res.ok || data.error) {
-        throw new Error(data.error || 'Generation failed.');
-      }
+      if (!res.ok || data.error) throw new Error(data.error || 'Generation failed.');
 
       pp2RemoveSkeletons();
       const items = data.results || [];
-      if (!items.length && data.preview_url) {
-        items.push({ preview_url: data.preview_url, generation_id: data.generation_id });
-      }
-
       items.forEach(item => {
         if (item.preview_url && item.generation_id) {
-          pp2RenderPreview(item.preview_url, item.generation_id);
+          pp2RenderCard(item.preview_url, item.generation_id);
         }
       });
 
-      if (!items.length) throw new Error('No previews returned.');
+      if (!items.length) throw new Error('No images returned.');
 
+      pp2SetStatus(true, `✅ ${items.length} images hosted — tap Download on any card`);
       if (data.partial_errors && data.partial_errors.length) {
-        pp2ShowError(`Got ${items.length}/6 previews. Tap Generate again for more.`);
-      } else {
-        pp2HideError();
-        pp2SetStatus(true, `✅ ${items.length} previews ready`);
+        pp2ShowError(`Got ${items.length}/6. Hit Generate again for more.`);
       }
     } catch (e) {
       pp2RemoveSkeletons();
+      pp2SetStatus(false);
       if (e.message === 'LOG_IN') {
         pp2ShowError('Session expired. <a href="/login?next=/percfectpictures2.0" style="color:#c4b5fd">Log in →</a>');
       } else {
-        pp2ShowError(e.message || 'Generation failed — try again.');
+        pp2ShowError(e.message || 'Generation failed.');
       }
-      pp2SetStatus(false);
     } finally {
       pp2Busy = false;
       btn.disabled = false;
     }
   }
 
-  document.getElementById('pp2-generate-btn').addEventListener('click', function () {
-    pp2BackendGenerate(document.getElementById('pp2-princess').value);
-  });
-
-  window.addEventListener('message', function (e) {
-    if (!e.data) return;
-    if (e.data.type === 'percfect-studio-generate' && e.data.princess) {
-      const sel = document.getElementById('pp2-princess');
-      if (sel && e.data.princess) sel.value = e.data.princess;
-      pp2BackendGenerate(e.data.princess);
-    }
-  });
-
-  async function pp2Unlock(genId, btn) {
+  async function pp2Download(genId, btn) {
     if (!pp2LoggedIn) {
       window.location.href = '/login?next=/percfectpictures2.0';
       return;
     }
-
     if (btn) { btn.disabled = true; btn.textContent = '…'; }
     pp2HideError();
 
@@ -331,19 +252,20 @@
       if (!res.ok || data.error) {
         const msg = res.status === 402
           ? `${data.error} <a href="/buy-credits" style="color:#c4b5fd">Buy credits →</a>`
-          : (data.error || 'Unlock failed.');
+          : (data.error || 'Download failed.');
         pp2ShowError(msg);
-        if (btn) { btn.disabled = false; btn.textContent = '🔓 Unlock — 1 Credit'; }
+        if (btn) { btn.disabled = false; btn.textContent = '⬇ Download Full Image'; }
         return;
       }
 
-      const card = document.querySelector(`.pp2-card[data-gen-id="${genId}"]`);
-      if (card) {
-        card.querySelector('.pp2-unlock-overlay')?.remove();
-        const img = card.querySelector('img');
-        if (img) img.src = data.url;
-        card.insertAdjacentHTML('beforeend', `<a class="pp2-dl" href="${data.url}" download="percfect-princess.jpg" target="_blank">⬇ Download</a>`);
+      const url = data.url;
+      if (btn) {
+        btn.textContent = '⬇ Downloaded';
+        btn.classList.add('done');
+        btn.disabled = false;
+        btn.onclick = () => { window.location.href = url; };
       }
+      window.location.href = url;
 
       const countEl = document.getElementById('pp2-credit-count');
       if (countEl) {
@@ -354,10 +276,12 @@
       if (e.message === 'LOG_IN') {
         window.location.href = '/login?next=/percfectpictures2.0';
       } else {
-        pp2ShowError(e.message || 'Unlock failed.');
+        pp2ShowError(e.message || 'Download failed.');
       }
-      if (btn) { btn.disabled = false; btn.textContent = '🔓 Unlock — 1 Credit'; }
+      if (btn) { btn.disabled = false; btn.textContent = '⬇ Download Full Image'; }
     }
   }
+
+  document.getElementById('pp2-generate-btn').addEventListener('click', pp2Generate);
 </script>
 {% endblock %}

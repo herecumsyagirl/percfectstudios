@@ -498,6 +498,48 @@ def _perchance_store_generation(prompt: str, image_bytes: bytes, source_url: str
     return {"preview_url": preview_url, "generation_id": row.data[0]["id"]}
 
 
+@app.route("/media/previews/<path:storage_path>")
+def serve_preview_media(storage_path):
+    """Serve blurred previews from percfectai.com (stored in Supabase)."""
+    if ".." in storage_path or storage_path.startswith("/"):
+        return jsonify({"error": "Invalid path."}), 400
+    try:
+        data = supabase.storage.from_("previews").download(storage_path)
+        return Response(
+            data,
+            mimetype="image/jpeg",
+            headers={"Cache-Control": "public, max-age=31536000"},
+        )
+    except Exception:
+        return jsonify({"error": "Preview not found."}), 404
+
+
+@app.route("/media/download/<int:gen_id>")
+@login_required
+def media_download(gen_id):
+    """Download full-quality image from percfectai.com after unlock."""
+    res = supabase.table("generations").select("*")\
+        .eq("id", gen_id).eq("user_id", current_user.id)\
+        .eq("source", "perchance").maybe_single().execute()
+    gen = res.data
+    if not gen:
+        return jsonify({"error": "Generation not found."}), 404
+    if not gen.get("unlocked") and not current_user.is_admin:
+        return jsonify({"error": "Unlock this image first (1 credit)."}), 402
+    try:
+        data = supabase.storage.from_("originals").download(gen["output_url"])
+        return Response(
+            data,
+            mimetype="image/jpeg",
+            headers={
+                "Content-Disposition": f'attachment; filename="percfect-{gen_id}.jpg"',
+                "Cache-Control": "private, max-age=3600",
+            },
+        )
+    except Exception:
+        return jsonify({"error": "File not found."}), 404
+
+
 @app.route("/studios/princess-engine")
 def princess_engine():
     """Private studio engine frame — not linked publicly."""
@@ -542,14 +584,32 @@ def _create_preview(image_bytes: bytes) -> bytes:
     return out.getvalue()
 
 
+def _site_base_url() -> str:
+    env = (os.getenv("SITE_URL") or "").strip().rstrip("/")
+    if env:
+        return env
+    try:
+        return request.url_root.rstrip("/")
+    except RuntimeError:
+        return "https://percfectai.com"
+
+
+def _rehost_preview_url(storage_path: str) -> str:
+    return f"{_site_base_url()}/media/previews/{storage_path}"
+
+
+def _rehost_download_url(gen_id: int) -> str:
+    return f"{_site_base_url()}/media/download/{gen_id}"
+
+
 def _upload_storage(bucket: str, path: str, data: bytes, content_type: str = "image/jpeg") -> str:
-    """Upload bytes to Supabase Storage; return public URL for previews, path for originals."""
+    """Upload bytes to Supabase Storage; return rehosted URL for previews, path for originals."""
     supabase.storage.from_(bucket).upload(
         path, data,
         file_options={"content-type": content_type, "upsert": "true"}
     )
     if bucket == "previews":
-        return supabase.storage.from_(bucket).get_public_url(path)
+        return _rehost_preview_url(path)
     return path
 
 
@@ -2536,10 +2596,7 @@ def preview_unlock():
         return jsonify({"error": "Generation not found."}), 404
 
     if gen.get("unlocked"):
-        signed = supabase.storage.from_("originals").create_signed_url(
-            gen["output_url"], 3600
-        )
-        return jsonify({"url": signed.get("signedURL") or signed.get("signed_url")})
+        return jsonify({"url": _rehost_download_url(int(gen_id))})
 
     credits_res = supabase.table("users").select("picture_credits")\
         .eq("id", current_user.id).single().execute()
@@ -2554,10 +2611,7 @@ def preview_unlock():
     supabase.table("generations").update({"unlocked": True})\
         .eq("id", gen_id).execute()
 
-    signed = supabase.storage.from_("originals").create_signed_url(
-        gen["output_url"], 3600
-    )
-    return jsonify({"url": signed.get("signedURL") or signed.get("signed_url")})
+    return jsonify({"url": _rehost_download_url(int(gen_id))})
 
 
 @app.route("/percfectstudios/perchance-unlock", methods=["POST"])
