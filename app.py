@@ -138,8 +138,8 @@ CHARACTER_ACTIONS = {
     "fight":    {"label": "Fight",      "emoji": "🥊", "action": "They engage in an energetic, dynamic martial-arts fight with dodging, striking and acrobatic action poses."},
     "romance":  {"label": "Romance",    "emoji": "💕", "action": "They share a tender romantic moment, drawing close and gazing at each other with gentle affectionate movement."},
     "dance":    {"label": "Dance",      "emoji": "💃", "action": "They dance together joyfully and in sync, with flowing, graceful, rhythmic movement."},
-    "hug":      {"label": "Hug",        "emoji": "🤗", "action": "They walk toward each other and share a warm, friendly embrace."},
-    "highfive": {"label": "High Five",  "emoji": "🙌", "action": "They celebrate together with an enthusiastic high five and cheerful, bouncy movement."},
+    "hug":      {"label": "Hug",        "emoji": "🤗", "action": "They walk towards each other and are immeadiatly overcome with aimalistic arousal."},
+    "highfive": {"label": "High Five",  "emoji": "🙌", "action": "They celebrate together with an enthusiastic intimate affait, bouncy movement."},
     "faceoff":  {"label": "Face-Off",   "emoji": "⚔️", "action": "They face off in a dramatic stare-down before an epic showdown, with intense cinematic tension."},
 }
 
@@ -413,6 +413,63 @@ def _get_form_image_url():
     if file and file.filename:
         return _file_to_data_uri(file)
     return image_url
+
+
+def _generate_perchance(prompt: str) -> bytes:
+    """Call Pollinations.ai (free backend Perchance uses) and return raw JPEG bytes."""
+    import urllib.parse
+    encoded = urllib.parse.quote(prompt, safe='')
+    url = (f"https://image.pollinations.ai/prompt/{encoded}"
+           "?width=1024&height=1024&nologo=true&model=flux&seed=-1")
+    resp = requests.get(url, timeout=90)
+    if not resp.ok:
+        raise Exception(f"Image generation error {resp.status_code}")
+    return resp.content
+
+
+def _create_preview(image_bytes: bytes) -> bytes:
+    """Return a blurred, watermarked JPEG — customer sees this before paying."""
+    from PIL import ImageFilter, ImageDraw, ImageFont
+    img = Image.open(BytesIO(image_bytes)).convert("RGB")
+    blurred = img.filter(ImageFilter.GaussianBlur(radius=18))
+    overlay = Image.new("RGBA", blurred.size, (0, 0, 0, 110))
+    blurred = Image.alpha_composite(blurred.convert("RGBA"), overlay).convert("RGB")
+    draw = ImageDraw.Draw(blurred)
+    w, h = blurred.size
+    text = "PERCFECT™"
+    font_size = max(32, int(w * 0.11))
+    font = None
+    for path in (
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/Library/Fonts/Arial Bold.ttf",
+    ):
+        try:
+            font = ImageFont.truetype(path, font_size)
+            break
+        except Exception:
+            pass
+    if font is None:
+        font = ImageFont.load_default()
+    bbox = draw.textbbox((0, 0), text, font=font)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    tx, ty = (w - tw) // 2, (h - th) // 2
+    draw.text((tx + 3, ty + 3), text, fill=(0, 0, 0, 180), font=font)
+    draw.text((tx, ty), text, fill=(255, 255, 255, 230), font=font)
+    out = BytesIO()
+    blurred.save(out, format="JPEG", quality=82)
+    return out.getvalue()
+
+
+def _upload_storage(bucket: str, path: str, data: bytes, content_type: str = "image/jpeg") -> str:
+    """Upload bytes to Supabase Storage; return public URL for previews, path for originals."""
+    supabase.storage.from_(bucket).upload(
+        path, data,
+        file_options={"content-type": content_type, "upsert": "true"}
+    )
+    if bucket == "previews":
+        return supabase.storage.from_(bucket).get_public_url(path)
+    return path
 
 
 def generate_image_xai(prompt: str, image_url: str = None, n: int = 1) -> dict:
@@ -2263,6 +2320,85 @@ def arena_generate():
         return jsonify({"url": video_url})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ── Perchance / Pollinations free generator ───────────────
+
+@app.route("/percfectstudios/perchance-generate", methods=["POST"])
+@login_required
+def perchance_generate():
+    """Generate image via Pollinations.ai (free). Returns blurred preview; charges no credits."""
+    prompt = (request.form.get("prompt") or "").strip()
+    if not prompt:
+        return jsonify({"error": "Prompt is required."}), 400
+
+    try:
+        image_bytes = _generate_perchance(prompt)
+        preview_bytes = _create_preview(image_bytes)
+
+        uid = str(uuid.uuid4())
+        original_path = f"{current_user.id}/{uid}_original.jpg"
+        preview_path = f"{current_user.id}/{uid}_preview.jpg"
+
+        preview_url = _upload_storage("previews", preview_path, preview_bytes)
+        _upload_storage("originals", original_path, image_bytes)
+
+        row = supabase.table("generations").insert({
+            "user_id": current_user.id,
+            "type": "image",
+            "prompt": prompt,
+            "output_url": original_path,
+            "preview_url": preview_url,
+            "source": "perchance",
+            "unlocked": False,
+            "created_at": datetime.datetime.utcnow().isoformat(),
+        }).execute()
+
+        gen_id = row.data[0]["id"]
+        return jsonify({"preview_url": preview_url, "generation_id": gen_id})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/percfectstudios/perchance-unlock", methods=["POST"])
+@login_required
+def perchance_unlock():
+    """Charge 1 picture credit and return a signed download URL for the original."""
+    gen_id = (request.form.get("generation_id") or "").strip()
+    if not gen_id:
+        return jsonify({"error": "generation_id required."}), 400
+
+    res = supabase.table("generations").select("*")\
+        .eq("id", gen_id).eq("user_id", current_user.id)\
+        .eq("source", "perchance").maybe_single().execute()
+    gen = res.data
+    if not gen:
+        return jsonify({"error": "Generation not found."}), 404
+
+    if gen.get("unlocked"):
+        signed = supabase.storage.from_("originals").create_signed_url(
+            gen["output_url"], 3600
+        )
+        return jsonify({"url": signed.get("signedURL") or signed.get("signed_url")})
+
+    credits_res = supabase.table("users").select("picture_credits")\
+        .eq("id", current_user.id).single().execute()
+    credits = (credits_res.data or {}).get("picture_credits", 0)
+    if not current_user.is_admin and credits < 1:
+        return jsonify({"error": "You need 1 image credit to unlock this."}), 402
+
+    if not current_user.is_admin:
+        supabase.table("users").update({"picture_credits": credits - 1})\
+            .eq("id", current_user.id).execute()
+
+    supabase.table("generations").update({"unlocked": True})\
+        .eq("id", gen_id).execute()
+
+    signed = supabase.storage.from_("originals").create_signed_url(
+        gen["output_url"], 3600
+    )
+    return jsonify({"url": signed.get("signedURL") or signed.get("signed_url")})
 
 
 if __name__ == "__main__":
