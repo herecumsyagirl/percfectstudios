@@ -1596,6 +1596,55 @@ def create_checkout_session():
     return redirect(session_stripe.url, code=303)
 
 
+def _grant_purchase(session_id, user_id, package_key) -> bool:
+    """Grant a purchase's credits EXACTLY ONCE, keyed on the Stripe checkout session id.
+
+    Both /payment-success and the /webhook call this. The processed_payments table's
+    primary key on session_id is the idempotency lock: we claim the session first, and
+    only the caller that wins the insert grants credits. Returns True if credits were
+    granted, False if this session was already processed (or invalid).
+    """
+    if not session_id or user_id is None:
+        return False
+    pkg = CREDIT_PACKAGES.get(package_key)
+    if not pkg:
+        return False
+    try:
+        uid = int(user_id)
+    except (TypeError, ValueError):
+        return False
+
+    # Claim the session — a duplicate session_id raises (unique PK) → already processed.
+    try:
+        supabase.table("processed_payments").insert({
+            "session_id": session_id,
+            "user_id": uid,
+            "package": package_key,
+            "image_credits": pkg["image_credits"],
+            "video_credits": pkg["video_credits"],
+        }).execute()
+    except Exception:
+        return False  # already granted for this session
+
+    # We won the claim → grant once. If the grant fails, release the claim so a retry works.
+    try:
+        res = supabase.table("users").select("picture_credits,video_credits").eq("id", uid).single().execute()
+        if not res.data:
+            raise Exception("user not found")
+        supabase.table("users").update({
+            "picture_credits": res.data["picture_credits"] + pkg["image_credits"],
+            "video_credits": res.data["video_credits"] + pkg["video_credits"],
+            "has_purchased": True,
+        }).eq("id", uid).execute()
+        return True
+    except Exception:
+        try:
+            supabase.table("processed_payments").delete().eq("session_id", session_id).execute()
+        except Exception:
+            pass
+        raise
+
+
 @app.route("/payment-success")
 @login_required
 def payment_success():
@@ -1608,15 +1657,13 @@ def payment_success():
         if session.customer:
             _safe_user_update(current_user.id, {"stripe_customer_id": session.customer})
         pkg = CREDIT_PACKAGES.get(session.metadata.get("package"))
-        if pkg:
-            res = supabase.table("users").select("picture_credits,video_credits").eq("id", current_user.id).single().execute()
-            supabase.table("users").update({
-                "picture_credits": res.data["picture_credits"] + pkg["image_credits"],
-                "video_credits": res.data["video_credits"] + pkg["video_credits"],
-                "has_purchased": True,
-            }).eq("id", current_user.id).execute()
+        granted = _grant_purchase(session_id, current_user.id, session.metadata.get("package"))
+        if granted and pkg:
             flash(f"Payment successful! Added {pkg['image_credits']} image credits"
                   + (f" and {pkg['video_credits']} video credits" if pkg["video_credits"] else "") + ".", "success")
+        elif pkg:
+            # Already credited (e.g. webhook beat us here, or page refreshed) — no double grant.
+            flash("Payment received — your credits are on your account.", "info")
 
     return redirect(url_for("account_settings") + "#billing")
 
@@ -1634,17 +1681,9 @@ def stripe_webhook():
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         if session.get("payment_status") == "paid":
-            user_id = session.get("metadata", {}).get("user_id")
-            package_key = session.get("metadata", {}).get("package")
-            pkg = CREDIT_PACKAGES.get(package_key)
-            if user_id and pkg:
-                res = supabase.table("users").select("picture_credits,video_credits").eq("id", user_id).single().execute()
-                if res.data:
-                    supabase.table("users").update({
-                        "picture_credits": res.data["picture_credits"] + pkg["image_credits"],
-                        "video_credits": res.data["video_credits"] + pkg["video_credits"],
-                        "has_purchased": True,
-                    }).eq("id", user_id).execute()
+            meta = session.get("metadata", {}) or {}
+            # Idempotent: only grants if this session hasn't been credited yet.
+            _grant_purchase(session.get("id"), meta.get("user_id"), meta.get("package"))
 
     return "", 200
 
