@@ -539,6 +539,7 @@ async function loadRoster(){
           <div class="rchar-meta">${c.gender||''}${c.spin_video_url?' · has spin':''}</div>
           <div class="rchar-actions">
             <button class="rbtn" onclick='openEdit(${JSON.stringify(c)})'>✎ Edit</button>
+            <button class="rbtn" id="restyle-${c.id}" onclick="restyleChar(${c.id})">👗 Restyle</button>
             ${spinBtn}
             ${dl}
             <button class="rbtn danger" onclick="deleteChar(${c.id})">🗑</button>
@@ -559,6 +560,19 @@ async function rosterSpin(id){
     if(res.ok && d.url){ adjCredit('vid-credits',-6); loadRoster(); }
     else { alert(d.error||'Spin failed.'); if(b){ b.disabled=false; b.textContent='🎥 360°'; } }
   }catch(e){ if(b){ b.disabled=false; b.textContent='🎥 360°'; } }
+}
+
+async function restyleChar(id){
+  const outfit = prompt('New outfit for this character?\n(e.g. "knight armor", "winter coat", "formal gala dress", "streetwear", "business suit")');
+  if(!outfit || !outfit.trim()) return;
+  const b=document.getElementById('restyle-'+id); if(b){ b.disabled=true; b.textContent='👗 …'; }
+  const fd=new FormData(); fd.append('character_id',id); fd.append('outfit',outfit.trim());
+  try{
+    const res=await fetch('/studios/percfectcharacter/restyle',{method:'POST',body:fd});
+    const d=await res.json();
+    if(res.ok && d.character){ adjCredit('img-credits',-(d.charged||4)); loadRoster(); }
+    else { alert(d.error||'Restyle failed.'); if(b){ b.disabled=false; b.textContent='👗 Restyle'; } }
+  }catch(e){ alert('Network error — please try again.'); if(b){ b.disabled=false; b.textContent='👗 Restyle'; } }
 }
 
 async function deleteChar(id){

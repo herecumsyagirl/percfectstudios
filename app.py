@@ -2226,6 +2226,73 @@ def character_refine():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/studios/percfectcharacter/restyle", methods=["POST"])
+@login_required
+def character_restyle():
+    """Re-style an existing character into a new outfit: edit the front shot into the
+    new outfit, rebuild the 3 poses to match, and save it as a NEW character so the
+    original is kept. Costs 1 image credit per shot that succeeds (up to 4)."""
+    reset_daily_if_needed(current_user.id)
+    res = supabase.table("users").select("picture_credits,images_today").eq("id", current_user.id).single().execute()
+    u = res.data
+
+    char_id = request.form.get("character_id", "").strip()
+    outfit = request.form.get("outfit", "").strip()
+    if not outfit:
+        return jsonify({"error": "Describe the new outfit."}), 400
+
+    cres = supabase.table("characters").select("*").eq("id", char_id).eq("user_id", current_user.id).maybe_single().execute()
+    char = cres.data if cres else None
+    if not char or not char.get("primary_image_url"):
+        return jsonify({"error": "Character not found."}), 404
+
+    COST = 4
+    if not current_user.is_admin and u["picture_credits"] < COST:
+        return jsonify({"error": f"Restyling needs {COST} image credits — you have {u['picture_credits']}. Buy credits or redeem a coupon code."}), 402
+
+    src = char["primary_image_url"]
+    try:
+        front_prompt = (
+            f"Show the EXACT same character — identical face, hairstyle, body and proportions — "
+            f"but now wearing {outfit}. Full front view, standing, plain white background, clean "
+            f"high-quality 3D animated style, consistent lighting, no distortion."
+        )
+        new_front = generate_image_xai(front_prompt, src)["data"][0]["url"]
+
+        from concurrent.futures import ThreadPoolExecutor
+        extras = CHARACTER_POSES[1:]
+
+        def _mk(desc):
+            return generate_image_xai(pose_edit_prompt(desc), new_front)["data"][0]["url"]
+
+        results = [None] * len(extras)
+        with ThreadPoolExecutor(max_workers=len(extras)) as ex:
+            futs = {ex.submit(_mk, desc): i for i, (k, desc) in enumerate(extras)}
+            for f in futs:
+                try:
+                    results[futs[f]] = f.result()
+                except Exception:
+                    pass
+        images = [new_front] + [r for r in results if r]
+        made = len(images)
+
+        if not current_user.is_admin:
+            supabase.table("users").update({
+                "picture_credits": max(0, u["picture_credits"] - made),
+                "images_today": u["images_today"] + made,
+            }).eq("id", current_user.id).execute()
+
+        name = ((char.get("name") or "Character") + f" ({outfit[:24]})")[:80]
+        row = supabase.table("characters").insert({
+            "user_id": current_user.id, "name": name, "gender": char.get("gender"),
+            "images": images, "primary_image_url": new_front, "spin_video_url": None,
+            "prompt": char.get("prompt"), "source_mode": char.get("source_mode") or "describe",
+        }).execute()
+        return jsonify({"ok": True, "character": _serialize_character(row.data[0]), "images": images, "charged": made})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/studios/percfectcharacter/generate-spin", methods=["POST"])
 @login_required
 def character_generate_spin():
