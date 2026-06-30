@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Percfect Pictures 2.0 — AI Image Generator{% endblock %}
+{% block title %}Percfect Pictures 2.0 — Free Preview · Pay to Unlock{% endblock %}
 
 {% block content %}
 <style>
@@ -42,7 +42,7 @@
 
   .pp2-notice {
     margin-top: 0.75rem; font-size: 0.8rem; color: var(--text-muted);
-    display: flex; align-items: center; gap: 0.4rem;
+    display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
   }
 
   .pp2-grid {
@@ -83,7 +83,8 @@
     cursor: pointer; transition: opacity 0.15s; white-space: nowrap;
   }
   .pp2-unlock-btn:hover { opacity: 0.85; }
-  .pp2-unlock-label { font-size: 0.72rem; color: rgba(255,255,255,0.7); }
+  .pp2-unlock-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .pp2-unlock-label { font-size: 0.72rem; color: rgba(255,255,255,0.7); text-align: center; padding: 0 0.5rem; }
 
   .pp2-card-actions {
     padding: 0.6rem 0.75rem; display: flex; gap: 0.4rem; flex-wrap: wrap;
@@ -106,7 +107,7 @@
     background: var(--bg-2); border: 1px solid var(--border-2);
     border-radius: 12px; padding: 0.7rem 1rem; margin-bottom: 1rem;
     display: flex; align-items: center; justify-content: space-between;
-    font-size: 0.85rem;
+    font-size: 0.85rem; gap: 0.75rem; flex-wrap: wrap;
   }
   .pp2-credits-count { font-weight: 700; color: var(--accent); }
 
@@ -120,15 +121,23 @@
 <div class="pp2-wrap">
   <div class="pp2-hero">
     <h1>✦ Percfect Pictures <span class="pp2-badge">2.0</span></h1>
-    <p>Generate free previews — unlock the full image for 1 credit</p>
+    <p>Hit generate → backend hits Perchance → blurred preview lands here → pay 1 credit to unlock full quality</p>
   </div>
 
   {% if current_user.is_authenticated %}
   <div class="pp2-credits-bar">
     <span>Your image credits</span>
-    <span class="pp2-credits-count" id="pp2-credit-count">
-      {{ current_user.picture_credits if current_user.picture_credits is defined else '—' }}
-    </span>
+    <div style="display:flex;align-items:center;gap:0.75rem;">
+      <span class="pp2-credits-count" id="pp2-credit-count">
+        {{ user.picture_credits if user and user.picture_credits is defined else (current_user.picture_credits or 0) }}
+      </span>
+      <a href="/buy-credits" class="btn btn-sm btn-accent" style="font-size:0.75rem;padding:0.35rem 0.75rem;">Buy credits</a>
+    </div>
+  </div>
+  {% else %}
+  <div class="pp2-credits-bar">
+    <span>Log in to generate free blurred previews</span>
+    <a href="/login?next=/percfectpictures2.0" class="btn btn-sm btn-accent" style="font-size:0.75rem;padding:0.35rem 0.75rem;">Log in</a>
   </div>
   {% endif %}
 
@@ -136,41 +145,88 @@
     <textarea
       id="pp2-prompt"
       class="pp2-prompt"
-      placeholder="Describe what you want to create… be specific for better results"
+      placeholder="Describe what you want… backend generates via Perchance, you see blurred preview first"
       rows="3"
     ></textarea>
     <div class="pp2-controls">
-      <button class="btn btn-accent" id="pp2-generate-btn" onclick="pp2Generate()">✦ Generate Free Preview</button>
+      <button class="btn btn-accent" id="pp2-generate-btn" onclick="pp2Generate()">✦ Generate Blurred Preview</button>
       <select id="pp2-ratio">
         <option value="1024x1024" selected>Square</option>
         <option value="768x1024">Portrait</option>
         <option value="1024x768">Landscape</option>
       </select>
+      <select id="pp2-count" title="How many images to generate">
+        <option value="1" selected>1 image</option>
+        <option value="2">2 images</option>
+        <option value="3">3 images</option>
+        <option value="4">4 images</option>
+      </select>
     </div>
     <div class="pp2-notice">
-      🔒 Preview is free &nbsp;·&nbsp; Unlock full quality for 1 credit
+      🔒 Preview is free &nbsp;·&nbsp; Unlock full quality for 1 credit each &nbsp;·&nbsp; Powered by Perchance backend
     </div>
     <div class="pp2-error" id="pp2-error"></div>
   </div>
 
   <div class="pp2-grid" id="pp2-grid">
-    <div class="pp2-empty">
+    <div class="pp2-empty" id="pp2-empty">
       <div class="pp2-empty-icon">🖼</div>
-      <div>Generate a free preview to get started</div>
+      <div>Hit the button — blurred pics show up here behind the paywall</div>
     </div>
   </div>
 </div>
 
 <script>
-  let pp2GenId = null;
+  let pp2LoadingCount = 0;
 
   function pp2ShowError(msg) {
     const el = document.getElementById('pp2-error');
-    el.textContent = msg;
+    el.innerHTML = msg;
     el.style.display = 'block';
   }
   function pp2HideError() {
     document.getElementById('pp2-error').style.display = 'none';
+  }
+
+  function pp2ClearEmpty() {
+    const empty = document.getElementById('pp2-empty');
+    if (empty) empty.remove();
+  }
+
+  function pp2AddLoadingCards(n) {
+    pp2ClearEmpty();
+    const grid = document.getElementById('pp2-grid');
+    for (let i = 0; i < n; i++) {
+      const card = document.createElement('div');
+      card.className = 'pp2-card pp2-loading-card';
+      card.innerHTML = `
+        <div class="pp2-card-loading">
+          <div class="pp2-spinner"></div>
+          <div>Perchance generating…</div>
+        </div>`;
+      grid.prepend(card);
+    }
+  }
+
+  function pp2RemoveLoadingCards() {
+    document.querySelectorAll('.pp2-loading-card').forEach(el => el.remove());
+  }
+
+  function pp2RenderPreview(previewUrl, genId) {
+    pp2ClearEmpty();
+    const grid = document.getElementById('pp2-grid');
+    const card = document.createElement('div');
+    card.className = 'pp2-card';
+    card.dataset.genId = genId;
+    card.innerHTML = `
+      <div class="pp2-card-img-wrap">
+        <img src="${previewUrl}" alt="Blurred preview" class="pp2-preview-img">
+        <div class="pp2-unlock-overlay">
+          <button class="pp2-unlock-btn" onclick="pp2Unlock('${genId}', this)">🔓 Unlock — 1 Credit</button>
+          <span class="pp2-unlock-label">Blurred preview · Full quality behind paywall</span>
+        </div>
+      </div>`;
+    grid.prepend(card);
   }
 
   async function pp2Generate() {
@@ -183,62 +239,55 @@
     if (!prompt) { document.getElementById('pp2-prompt').focus(); return; }
 
     pp2HideError();
-    pp2GenId = null;
 
+    const count = parseInt(document.getElementById('pp2-count').value, 10) || 1;
+    const ratio = document.getElementById('pp2-ratio').value;
     const btn = document.getElementById('pp2-generate-btn');
     btn.disabled = true;
     btn.textContent = '⏳ Generating…';
 
-    const grid = document.getElementById('pp2-grid');
-    grid.innerHTML = `
-      <div class="pp2-card">
-        <div class="pp2-card-loading">
-          <div class="pp2-spinner"></div>
-          <div>Creating your image…</div>
-        </div>
-      </div>`;
+    pp2AddLoadingCards(count);
 
     try {
       const fd = new FormData();
       fd.append('prompt', prompt);
+      fd.append('ratio', ratio);
+      fd.append('count', String(count));
 
       const res = await fetch('/percfectstudios/perchance-generate', { method: 'POST', body: fd });
       const data = await res.json();
 
+      pp2RemoveLoadingCards();
+
       if (!res.ok || data.error) {
         pp2ShowError(data.error || 'Generation failed. Try again.');
-        grid.innerHTML = `<div class="pp2-empty"><div class="pp2-empty-icon">⚠️</div><div>Failed — try again</div></div>`;
+        if (!document.getElementById('pp2-grid').children.length) {
+          document.getElementById('pp2-grid').innerHTML = `
+            <div class="pp2-empty" id="pp2-empty">
+              <div class="pp2-empty-icon">⚠️</div>
+              <div>Failed — try again</div>
+            </div>`;
+        }
         return;
       }
 
-      pp2GenId = data.generation_id;
-      pp2RenderPreview(data.preview_url, pp2GenId);
+      const items = data.results || [{ preview_url: data.preview_url, generation_id: data.generation_id }];
+      items.forEach(item => pp2RenderPreview(item.preview_url, item.generation_id));
+
+      if (data.partial_errors && data.partial_errors.length) {
+        pp2ShowError('Some images failed: ' + data.partial_errors.join('; '));
+      }
 
     } catch (e) {
+      pp2RemoveLoadingCards();
       pp2ShowError('Network error — please try again.');
-      grid.innerHTML = `<div class="pp2-empty"><div class="pp2-empty-icon">⚠️</div><div>Failed — try again</div></div>`;
     } finally {
       btn.disabled = false;
-      btn.textContent = '✦ Generate Free Preview';
+      btn.textContent = '✦ Generate Blurred Preview';
     }
   }
 
-  function pp2RenderPreview(previewUrl, genId) {
-    const grid = document.getElementById('pp2-grid');
-    grid.innerHTML = `
-      <div class="pp2-card" id="pp2-result-card">
-        <div class="pp2-card-img-wrap">
-          <img src="${previewUrl}" alt="Blurred preview" id="pp2-preview-img">
-          <div class="pp2-unlock-overlay" id="pp2-overlay">
-            <button class="pp2-unlock-btn" onclick="pp2Unlock('${genId}')">🔓 Unlock Full Image — 1 Credit</button>
-            <span class="pp2-unlock-label">Full quality · No watermark · Download yours</span>
-          </div>
-        </div>
-      </div>`;
-  }
-
-  async function pp2Unlock(genId) {
-    const btn = document.querySelector('.pp2-unlock-btn');
+  async function pp2Unlock(genId, btn) {
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Unlocking…'; }
     pp2HideError();
 
@@ -250,36 +299,36 @@
       const data = await res.json();
 
       if (!res.ok || data.error) {
-        pp2ShowError(data.error || 'Could not unlock. Check your credits.');
-        if (btn) { btn.disabled = false; btn.textContent = '🔓 Unlock Full Image — 1 Credit'; }
+        const needsCredits = res.status === 402;
+        const msg = needsCredits
+          ? `${data.error || 'Need credits.'} <a href="/buy-credits" style="color:#c4b5fd;text-decoration:underline;">Buy credits →</a>`
+          : (data.error || 'Could not unlock.');
+        pp2ShowError(msg);
+        if (btn) { btn.disabled = false; btn.textContent = '🔓 Unlock — 1 Credit'; }
         return;
       }
 
-      // Replace preview with full image + download
-      const overlay = document.getElementById('pp2-overlay');
-      if (overlay) overlay.remove();
-
-      const img = document.getElementById('pp2-preview-img');
-      if (img) img.src = data.url;
-
-      const card = document.getElementById('pp2-result-card');
+      const card = document.querySelector(`.pp2-card[data-gen-id="${genId}"]`);
       if (card) {
+        const overlay = card.querySelector('.pp2-unlock-overlay');
+        if (overlay) overlay.remove();
+        const img = card.querySelector('.pp2-preview-img');
+        if (img) img.src = data.url;
         const actions = document.createElement('div');
         actions.className = 'pp2-card-actions';
         actions.innerHTML = `<a class="btn-sm btn-save" href="${data.url}" download="percfect-picture.jpg" target="_blank">⬇ Download Full Image</a>`;
         card.appendChild(actions);
       }
 
-      // Update credit count display
       const countEl = document.getElementById('pp2-credit-count');
       if (countEl) {
-        const current = parseInt(countEl.textContent) || 0;
+        const current = parseInt(countEl.textContent, 10) || 0;
         countEl.textContent = Math.max(0, current - 1);
       }
 
     } catch (e) {
       pp2ShowError('Network error — please try again.');
-      if (btn) { btn.disabled = false; btn.textContent = '🔓 Unlock Full Image — 1 Credit'; }
+      if (btn) { btn.disabled = false; btn.textContent = '🔓 Unlock — 1 Credit'; }
     }
   }
 

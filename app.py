@@ -415,16 +415,41 @@ def _get_form_image_url():
     return image_url
 
 
-def _generate_perchance(prompt: str) -> bytes:
+def _generate_perchance(prompt: str, width: int = 1024, height: int = 1024) -> bytes:
     """Call Pollinations.ai (free backend Perchance uses) and return raw JPEG bytes."""
     import urllib.parse
+    width = max(512, min(1536, int(width)))
+    height = max(512, min(1536, int(height)))
     encoded = urllib.parse.quote(prompt, safe='')
-    url = (f"https://image.pollinations.ai/prompt/{encoded}"
-           "?width=1024&height=1024&nologo=true&model=flux&seed=-1")
+    url = (
+        f"https://image.pollinations.ai/prompt/{encoded}"
+        f"?width={width}&height={height}&nologo=true&model=flux&seed=-1"
+    )
     resp = requests.get(url, timeout=90)
     if not resp.ok:
         raise Exception(f"Image generation error {resp.status_code}")
     return resp.content
+
+
+def _perchance_store_generation(prompt: str, image_bytes: bytes) -> dict:
+    """Blur, upload, and record one Perchance generation for the current user."""
+    preview_bytes = _create_preview(image_bytes)
+    uid = str(uuid.uuid4())
+    original_path = f"{current_user.id}/{uid}_original.jpg"
+    preview_path = f"{current_user.id}/{uid}_preview.jpg"
+    preview_url = _upload_storage("previews", preview_path, preview_bytes)
+    _upload_storage("originals", original_path, image_bytes)
+    row = supabase.table("generations").insert({
+        "user_id": current_user.id,
+        "type": "image",
+        "prompt": prompt,
+        "output_url": original_path,
+        "preview_url": preview_url,
+        "source": "perchance",
+        "unlocked": False,
+        "created_at": datetime.datetime.utcnow().isoformat(),
+    }).execute()
+    return {"preview_url": preview_url, "generation_id": row.data[0]["id"]}
 
 
 def _create_preview(image_bytes: bytes) -> bytes:
@@ -2332,35 +2357,39 @@ def arena_generate():
 @app.route("/percfectstudios/perchance-generate", methods=["POST"])
 @login_required
 def perchance_generate():
-    """Generate image via Pollinations.ai (free). Returns blurred preview; charges no credits."""
+    """Generate image(s) via Pollinations.ai (free). Returns blurred previews; charges no credits."""
     prompt = (request.form.get("prompt") or "").strip()
     if not prompt:
         return jsonify({"error": "Prompt is required."}), 400
 
     try:
-        image_bytes = _generate_perchance(prompt)
-        preview_bytes = _create_preview(image_bytes)
+        ratio = (request.form.get("ratio") or "1024x1024").lower().replace(" ", "")
+        if "x" in ratio:
+            w_s, h_s = ratio.split("x", 1)
+            width, height = int(w_s), int(h_s)
+        else:
+            width, height = 1024, 1024
 
-        uid = str(uuid.uuid4())
-        original_path = f"{current_user.id}/{uid}_original.jpg"
-        preview_path = f"{current_user.id}/{uid}_preview.jpg"
+        count = min(4, max(1, int(request.form.get("count") or 1)))
+        results = []
+        errors = []
+        for _ in range(count):
+            try:
+                image_bytes = _generate_perchance(prompt, width, height)
+                results.append(_perchance_store_generation(prompt, image_bytes))
+            except Exception as item_err:
+                errors.append(str(item_err))
 
-        preview_url = _upload_storage("previews", preview_path, preview_bytes)
-        _upload_storage("originals", original_path, image_bytes)
+        if not results:
+            return jsonify({"error": errors[0] if errors else "Generation failed."}), 500
 
-        row = supabase.table("generations").insert({
-            "user_id": current_user.id,
-            "type": "image",
-            "prompt": prompt,
-            "output_url": original_path,
-            "preview_url": preview_url,
-            "source": "perchance",
-            "unlocked": False,
-            "created_at": datetime.datetime.utcnow().isoformat(),
-        }).execute()
-
-        gen_id = row.data[0]["id"]
-        return jsonify({"preview_url": preview_url, "generation_id": gen_id})
+        payload = {"results": results}
+        if len(results) == 1:
+            payload["preview_url"] = results[0]["preview_url"]
+            payload["generation_id"] = results[0]["generation_id"]
+        if errors:
+            payload["partial_errors"] = errors
+        return jsonify(payload)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -2409,7 +2438,14 @@ def perchance_unlock():
 @app.route("/percfectpictures2.0")
 @app.route("/percfectpictures2")
 def percfect_pictures2():
-    return render_template("percfect_pictures2.html")
+    user_data = None
+    if current_user.is_authenticated:
+        reset_daily_if_needed(current_user.id)
+        res = supabase.table("users").select("picture_credits,video_credits").eq(
+            "id", current_user.id
+        ).single().execute()
+        user_data = res.data
+    return render_template("percfect_pictures2.html", user=user_data)
 
 
 if __name__ == "__main__":
