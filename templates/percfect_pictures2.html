@@ -165,21 +165,27 @@
     grid.prepend(card);
   }
 
-  async function pp2Capture(imageUrl) {
+  function pp2SetCapturing(on, text) {
+    const cap = document.getElementById('pp2-capturing');
+    cap.style.display = on ? 'block' : 'none';
+    if (text) cap.textContent = text;
+  }
+
+  async function pp2Capture(imageUrl, imageData) {
     {% if not current_user.is_authenticated %}
     pp2ShowError('Log in to save previews. <a href="/login?next=/percfectpictures2.0" style="color:#c4b5fd">Log in →</a>');
     return;
     {% endif %}
 
-    if (pp2Seen.has(imageUrl) || pp2Pending.has(imageUrl)) return;
-    pp2Pending.add(imageUrl);
-
-    const cap = document.getElementById('pp2-capturing');
-    cap.style.display = 'block';
+    const key = imageUrl || imageData;
+    if (pp2Seen.has(key) || pp2Pending.has(key)) return;
+    pp2Pending.add(key);
+    pp2SetCapturing(true, '⏳ Saving preview…');
 
     try {
       const fd = new FormData();
-      fd.append('image_url', imageUrl);
+      if (imageData) fd.append('image_data', imageData);
+      else fd.append('image_url', imageUrl);
 
       const res = await fetch('/percfectstudios/preview-capture', { method: 'POST', body: fd });
       const data = await res.json();
@@ -189,20 +195,69 @@
         return;
       }
 
-      pp2Seen.add(imageUrl);
+      pp2Seen.add(key);
       pp2RenderPreview(data.preview_url, data.generation_id);
       pp2HideError();
     } catch (e) {
       pp2ShowError('Network error — try again.');
     } finally {
-      pp2Pending.delete(imageUrl);
-      if (!pp2Pending.size) cap.style.display = 'none';
+      pp2Pending.delete(key);
+      if (!pp2Pending.size) pp2SetCapturing(false);
+    }
+  }
+
+  async function pp2BackendGenerate(princess) {
+    {% if not current_user.is_authenticated %}
+    pp2ShowError('Log in to save previews. <a href="/login?next=/percfectpictures2.0" style="color:#c4b5fd">Log in →</a>');
+    return;
+    {% endif %}
+
+    pp2HideError();
+    pp2SetCapturing(true, '⏳ Generating previews…');
+
+    try {
+      const fd = new FormData();
+      fd.append('princess', princess || 'Jasmine');
+      fd.append('count', '6');
+
+      const res = await fetch('/percfectstudios/perchance-generate', { method: 'POST', body: fd });
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        pp2ShowError(data.error || 'Generation failed — try again.');
+        return;
+      }
+
+      const items = data.results || [{ preview_url: data.preview_url, generation_id: data.generation_id }];
+      items.forEach(item => pp2RenderPreview(item.preview_url, item.generation_id));
+
+      if (data.partial_errors && data.partial_errors.length) {
+        pp2ShowError('Some images failed — partial batch saved.');
+      }
+    } catch (e) {
+      pp2ShowError('Network error — try again.');
+    } finally {
+      pp2SetCapturing(false);
     }
   }
 
   window.addEventListener('message', function (e) {
-    if (!e.data || e.data.type !== 'percfect-studio-image') return;
-    if (e.data.url) pp2Capture(e.data.url);
+    if (!e.data) return;
+    if (e.data.type === 'percfect-studio-image' && e.data.url) {
+      pp2Capture(e.data.url);
+    }
+    if (e.data.type === 'percfect-studio-blob' && e.data.data) {
+      pp2Capture(null, e.data.data);
+    }
+    if (e.data.type === 'percfect-studio-generate' && e.data.princess) {
+      pp2BackendGenerate(e.data.princess);
+      const iframe = document.getElementById('pp2-studio');
+      if (iframe && iframe.contentWindow) {
+        [5000, 12000, 25000, 50000].forEach(ms => {
+          setTimeout(() => iframe.contentWindow.postMessage({ type: 'percfect-force-scan' }, '*'), ms);
+        });
+      }
+    }
   });
 
   async function pp2Unlock(genId, btn) {

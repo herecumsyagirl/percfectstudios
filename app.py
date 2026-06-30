@@ -2453,23 +2453,29 @@ def perchance_generate():
 def preview_capture():
     """Download a studio image and store blurred preview for paywall."""
     image_url = (request.form.get("image_url") or "").strip()
-    if not image_url:
-        return jsonify({"error": "image_url required."}), 400
-    if not _is_allowed_perchance_image_url(image_url):
-        return jsonify({"error": "Invalid image source."}), 400
+    image_data = (request.form.get("image_data") or "").strip()
 
     try:
-        resp = requests.get(image_url, timeout=120, headers={"User-Agent": "PercfectStudios/1.0"})
-        if not resp.ok:
-            return jsonify({"error": f"Could not fetch image ({resp.status_code})."}), 502
-        content_type = (resp.headers.get("content-type") or "").lower()
-        if "image" not in content_type and not image_url.lower().split("?")[0].endswith(
-            (".jpg", ".jpeg", ".png", ".webp")
-        ):
-            return jsonify({"error": "URL did not return an image."}), 400
+        if image_data.startswith("data:"):
+            _header, _comma, b64 = image_data.partition(",")
+            image_bytes = base64.b64decode(b64)
+        elif image_url:
+            if not _is_allowed_perchance_image_url(image_url):
+                return jsonify({"error": "Invalid image source."}), 400
+            resp = requests.get(image_url, timeout=120, headers={"User-Agent": "PercfectStudios/1.0"})
+            if not resp.ok:
+                return jsonify({"error": f"Could not fetch image ({resp.status_code})."}), 502
+            content_type = (resp.headers.get("content-type") or "").lower()
+            if "image" not in content_type and not image_url.lower().split("?")[0].endswith(
+                (".jpg", ".jpeg", ".png", ".webp")
+            ):
+                return jsonify({"error": "URL did not return an image."}), 400
+            image_bytes = resp.content
+        else:
+            return jsonify({"error": "image_url required."}), 400
 
         prompt = "Percfect Princess Studio"
-        result = _perchance_store_generation(prompt, resp.content, source_url=image_url)
+        result = _perchance_store_generation(prompt, image_bytes, source_url=image_url)
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

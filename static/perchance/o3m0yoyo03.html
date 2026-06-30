@@ -5662,19 +5662,94 @@
   var style = document.createElement("style");
   style.textContent = "a[href*='perchance.org']{display:none!important;visibility:hidden!important;}";
   document.head.appendChild(style);
+
   var sent = new Set();
-  function captureImages() {
+  function emitUrl(url) {
+    if (!url || sent.has(url)) return;
+    if (url.indexOf("/lib/") !== -1 || url.indexOf("favicon") !== -1) return;
+    if (!/^https?:\/\//i.test(url)) return;
+    sent.add(url);
+    try { window.parent.postMessage({ type: "percfect-studio-image", url: url }, "*"); } catch (e) {}
+  }
+
+  function scanDom() {
     document.querySelectorAll("img[src]").forEach(function (img) {
       var src = img.src || "";
-      if (!src.startsWith("http") || sent.has(src)) return;
-      if (src.indexOf("/lib/") !== -1 || src.indexOf("favicon") !== -1) return;
-      sent.add(src);
-      try { window.parent.postMessage({ type: "percfect-studio-image", url: src }, "*"); } catch (e) {}
+      if (src.startsWith("http")) emitUrl(src);
+      else if (src.startsWith("blob:")) {
+        fetch(src).then(function (r) { return r.blob(); }).then(function (b) {
+          var rd = new FileReader();
+          rd.onload = function () {
+            try { window.parent.postMessage({ type: "percfect-studio-blob", data: rd.result }, "*"); } catch (e) {}
+          };
+          rd.readAsDataURL(b);
+        }).catch(function () {});
+      }
+    });
+    document.querySelectorAll("[style*='url(']").forEach(function (el) {
+      var m = (el.getAttribute("style") || "").match(/url\(["']?(https?:[^"')]+)/i);
+      if (m) emitUrl(m[1]);
     });
   }
-  var obs = new MutationObserver(captureImages);
-  obs.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["src"] });
-  setInterval(captureImages, 1500);
+
+  function harvestText(text) {
+    if (!text || text.length < 20) return;
+    var re = /https?:\/\/(?:user-uploads\.perchance\.org|image\.pollinations\.ai|i\.pollinations\.ai|cdn\.pollinations\.ai|image-generation\.perchance\.org)[^\s"'<>\\]*/gi;
+    var m;
+    while ((m = re.exec(text))) emitUrl(m[0].replace(/[\\,]+$/, ""));
+  }
+
+  var origFetch = window.fetch;
+  if (origFetch) {
+    window.fetch = function () {
+      return origFetch.apply(this, arguments).then(function (res) {
+        try {
+          var clone = res.clone();
+          clone.text().then(harvestText).catch(function () {});
+        } catch (e) {}
+        return res;
+      });
+    };
+  }
+
+  var XO = XMLHttpRequest.prototype.open;
+  var XS = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.open = function (m, url) { this._percfectUrl = url; return XO.apply(this, arguments); };
+  XMLHttpRequest.prototype.send = function () {
+    this.addEventListener("load", function () {
+      try { harvestText(this.responseText || ""); } catch (e) {}
+    });
+    return XS.apply(this, arguments);
+  };
+
+  function getPrincessName() {
+    var sel = document.getElementById("princessInput") || document.querySelector("select");
+    if (sel && sel.options && sel.selectedIndex >= 0)
+      return (sel.options[sel.selectedIndex].text || "Jasmine").trim();
+    return "Jasmine";
+  }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target;
+    if (!t) return;
+    var btn = t.id === "generateBtn" ? t : (t.closest ? t.closest("#generateBtn") : null);
+    if (!btn && t.tagName === "BUTTON" && (t.textContent || "").indexOf("Generate") >= 0) btn = t;
+    if (btn) {
+      try { window.parent.postMessage({ type: "percfect-studio-generate", princess: getPrincessName() }, "*"); } catch (e) {}
+      setTimeout(scanDom, 3000);
+      setTimeout(scanDom, 8000);
+      setTimeout(scanDom, 20000);
+      setTimeout(scanDom, 45000);
+    }
+  }, true);
+
+  window.addEventListener("message", function (e) {
+    if (e.data && e.data.type === "percfect-force-scan") scanDom();
+  });
+
+  var obs = new MutationObserver(scanDom);
+  obs.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["src", "style"] });
+  setInterval(scanDom, 2000);
 })();
 </script>
 </html>
