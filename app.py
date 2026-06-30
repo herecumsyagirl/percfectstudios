@@ -24,6 +24,7 @@ from perchance_princess import (
     normalize_princess_key,
     PRINCESS_KEYS,
     build_princess_prompts,
+    build_princess_prompt,
 )
 
 # Let Pillow decode iPhone HEIC/HEIF photos. Safe no-op if the package
@@ -518,6 +519,9 @@ def serve_preview_media(storage_path):
 @login_required
 def media_download(gen_id):
     """Download full-quality image from percfectai.com after unlock."""
+    blocked = _adult_required_response()
+    if blocked:
+        return blocked
     res = supabase.table("generations").select("*")\
         .eq("id", gen_id).eq("user_id", current_user.id)\
         .eq("source", "perchance").maybe_single().execute()
@@ -551,16 +555,14 @@ def princess_engine():
 
 
 def _create_preview(image_bytes: bytes) -> bytes:
-    """Return a blurred, watermarked JPEG — customer sees this before paying."""
-    from PIL import ImageFilter, ImageDraw, ImageFont
-    img = Image.open(BytesIO(image_bytes)).convert("RGB")
-    blurred = img.filter(ImageFilter.GaussianBlur(radius=18))
-    overlay = Image.new("RGBA", blurred.size, (0, 0, 0, 110))
-    blurred = Image.alpha_composite(blurred.convert("RGBA"), overlay).convert("RGB")
-    draw = ImageDraw.Draw(blurred)
-    w, h = blurred.size
-    text = "PERCFECT™"
-    font_size = max(32, int(w * 0.11))
+    """Watermark-only preview JPEG — sharp enough to inspect before purchase."""
+    from PIL import ImageDraw, ImageFont
+    base = Image.open(BytesIO(image_bytes)).convert("RGBA")
+    overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    w, h = base.size
+    label = "PERCFECT™"
+    font_size = max(24, int(w * 0.06))
     font = None
     for path in (
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -574,13 +576,14 @@ def _create_preview(image_bytes: bytes) -> bytes:
             pass
     if font is None:
         font = ImageFont.load_default()
-    bbox = draw.textbbox((0, 0), text, font=font)
+    bbox = draw.textbbox((0, 0), label, font=font)
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
     tx, ty = (w - tw) // 2, (h - th) // 2
-    draw.text((tx + 3, ty + 3), text, fill=(0, 0, 0, 180), font=font)
-    draw.text((tx, ty), text, fill=(255, 255, 255, 230), font=font)
+    draw.text((tx + 2, ty + 2), label, fill=(0, 0, 0, 120), font=font)
+    draw.text((tx, ty), label, fill=(255, 255, 255, 160), font=font)
+    out_img = Image.alpha_composite(base, overlay).convert("RGB")
     out = BytesIO()
-    blurred.save(out, format="JPEG", quality=82)
+    out_img.save(out, format="JPEG", quality=85)
     return out.getvalue()
 
 
@@ -733,7 +736,7 @@ def _user_is_adult(birthday: str) -> bool:
     if not birthday:
         return False
     try:
-        born = datetime.date.fromisoformat(birthday)
+        born = datetime.date.fromisoformat(str(birthday)[:10])
         today = datetime.date.today()
         age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
         return age >= 18
@@ -741,10 +744,47 @@ def _user_is_adult(birthday: str) -> bool:
         return False
 
 
+def _current_user_is_adult() -> bool:
+    if not current_user.is_authenticated:
+        return False
+    if current_user.is_admin:
+        return True
+    res = supabase.table("users").select("is_adult,birthday").eq(
+        "id", current_user.id
+    ).single().execute()
+    data = res.data or {}
+    if data.get("is_adult"):
+        return True
+    birthday = data.get("birthday") or ""
+    if birthday and _user_is_adult(birthday):
+        try:
+            supabase.table("users").update({"is_adult": True}).eq(
+                "id", current_user.id
+            ).execute()
+        except Exception:
+            pass
+        return True
+    return False
+
+
+def _adult_required_response():
+    """Return a 403 JSON response if the logged-in user is not 18+."""
+    if current_user.is_admin or _current_user_is_adult():
+        return None
+    return jsonify({
+        "error": "You must be 18 or older. Add your date of birth in Settings.",
+        "needs_adult": True,
+    }), 403
+
+
 def _do_register(username, password, birthday="", ip=None, email=None):
     import re
     if not username or not password or not email:
         return None, "All fields are required."
+    if not birthday:
+        return None, "Date of birth is required."
+    if not _user_is_adult(birthday):
+        return None, "You must be 18 or older to register."
     if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
         return None, "Enter a valid email address."
     if len(password) < 8 or not re.search(r'[A-Z]', password) \
@@ -2574,12 +2614,60 @@ def arena_generate():
         return jsonify({"error": str(e)}), 500
 
 
+
+
+@app.route("/percfectstudios/princess-batch", methods=["POST"])
+@login_required
+def princess_batch():
+    """Batch-generate princess images via Playwright on Perchance (not Pollinations)."""
+    blocked = _adult_required_response()
+    if blocked:
+        return blocked
+    princess_raw = (request.form.get("princess") or "").strip()
+    princess_key = normalize_princess_key(princess_raw) if princess_raw else "Jasmine"
+    count = PRINCESS_DEFAULT_COUNT
+    try:
+        from perchance_princess_batch import run_princess_batch, validate_image_bytes
+        images = run_princess_batch(princess_key, count=count)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    results = []
+    errors = []
+    for i, image_bytes in enumerate(images):
+        if not validate_image_bytes(image_bytes):
+            errors.append(f"Image {i + 1} failed validation")
+            continue
+        try:
+            prompt = build_princess_prompt(princess_key)
+            results.append(_perchance_store_generation(prompt, image_bytes))
+        except Exception as item_err:
+            errors.append(str(item_err))
+
+    if not results:
+        return jsonify({"error": errors[0] if errors else "Batch generation failed."}), 500
+
+    payload = {
+        "results": results,
+        "source": "princess",
+        "princess": princess_key,
+    }
+    if len(results) < count:
+        payload["partial"] = True
+    if errors:
+        payload["partial_errors"] = errors
+    return jsonify(payload)
+
+
 # ── Perchance / Pollinations free generator ───────────────
 
 @app.route("/percfectstudios/perchance-generate", methods=["POST"])
 @login_required
 def perchance_generate():
     """Generate image(s) via Pollinations.ai (free). Returns blurred previews; charges no credits."""
+    blocked = _adult_required_response()
+    if blocked:
+        return blocked
     princess_raw = (request.form.get("princess") or "").strip()
     princess_key = normalize_princess_key(princess_raw) if princess_raw else ""
     prompt = (request.form.get("prompt") or "").strip()
@@ -2650,6 +2738,9 @@ def perchance_generate():
 @login_required
 def preview_capture():
     """Download a studio image and store blurred preview for paywall."""
+    blocked = _adult_required_response()
+    if blocked:
+        return blocked
     image_url = (request.form.get("image_url") or "").strip()
     image_data = (request.form.get("image_data") or "").strip()
 
@@ -2690,6 +2781,9 @@ def perchance_capture_alias():
 @login_required
 def preview_unlock():
     """Charge 1 picture credit and return a signed download URL for the original."""
+    blocked = _adult_required_response()
+    if blocked:
+        return blocked
     gen_id = (request.form.get("generation_id") or "").strip()
     if not gen_id:
         return jsonify({"error": "generation_id required."}), 400
@@ -2731,15 +2825,18 @@ def perchance_unlock_alias():
 @app.route("/percfectpictures2")
 def percfect_pictures2():
     user_data = None
+    user_is_adult = False
     if current_user.is_authenticated:
         reset_daily_if_needed(current_user.id)
         res = supabase.table("users").select("picture_credits,video_credits").eq(
             "id", current_user.id
         ).single().execute()
         user_data = res.data
+        user_is_adult = _current_user_is_adult()
     return render_template(
         "percfect_pictures2.html",
         user=user_data,
+        user_is_adult=user_is_adult,
         princess_keys=PRINCESS_KEYS,
     )
 

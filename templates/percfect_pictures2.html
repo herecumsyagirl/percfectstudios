@@ -29,13 +29,7 @@
     border: 1px solid var(--border-2); background: var(--bg-3);
     color: var(--text); font-size: 0.95rem;
   }
-  .pp2-generate-btn {
-    padding: 0.7rem 1.25rem; border: none; border-radius: 10px;
-    background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    color: #fff; font-size: 0.95rem; font-weight: 800; cursor: pointer; white-space: nowrap;
-  }
-  .pp2-generate-btn:disabled { opacity: 0.55; cursor: wait; }
-  .pp2-meta { margin-top: 0.6rem; font-size: 0.78rem; color: var(--text-muted); display: flex; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+    .pp2-meta { margin-top: 0.6rem; font-size: 0.78rem; color: var(--text-muted); display: flex; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
   .pp2-credits { color: var(--accent); font-weight: 700; }
 
   .pp2-error {
@@ -80,8 +74,8 @@
     <h1>👑 Perfect Princess Generator</h1>
     <div class="pp2-steps">
       <span class="pp2-step"><strong>1</strong> Select</span>
-      <span class="pp2-step"><strong>2</strong> Generate</span>
-      <span class="pp2-step"><strong>3</strong> Download</span>
+      <span class="pp2-step"><strong>2</strong> Preview</span>
+      <span class="pp2-step"><strong>3</strong> Buy</span>
     </div>
     <p style="color:var(--text-muted);font-size:0.85rem;margin:0">Images are hosted on percfectai.com — not external sites.</p>
   </div>
@@ -96,31 +90,36 @@
         <option value="{{ name }}"{% if name == 'Jasmine' %} selected{% endif %}>{{ name }}</option>
         {% endfor %}
       </select>
-      <button id="pp2-generate-btn" class="pp2-generate-btn" type="button">Generate</button>
     </div>
     <div class="pp2-meta">
-      <span>6 images per generate · previews free · full download 1 credit each</span>
-      {% if current_user.is_authenticated %}
+      <span>10 images per selection · previews free · full download 1 credit each</span>
+      {% if current_user.is_authenticated and user_is_adult %}
       <span class="pp2-credits" id="pp2-credit-count">{{ user.picture_credits if user and user.picture_credits is defined else (current_user.picture_credits or 0) }} credits</span>
+      {% elif current_user.is_authenticated %}
+      <span><a href="/settings">Confirm 18+ in Settings</a> to generate</span>
       {% else %}
-      <span><a href="/login?next=/percfectpictures2.0">Log in</a> to generate</span>
+      <span><a href="/login?next=/percfectpictures2.0">Log in</a> · 18+ only</span>
       {% endif %}
     </div>
   </div>
 
   <div class="pp2-grid" id="pp2-grid">
     <div class="pp2-empty" id="pp2-empty">
-      {% if current_user.is_authenticated %}
-      Your hosted images will appear here after you hit Generate.
+      {% if current_user.is_authenticated and user_is_adult %}
+      Pick a princess — images generate automatically.
+      {% elif current_user.is_authenticated %}
+      <a href="/settings">Add your date of birth in Settings</a> — you must be 18+ to use this page.
       {% else %}
-      <a href="/login?next=/percfectpictures2.0">Log in</a> then select a princess and hit Generate.
+      <a href="/login?next=/percfectpictures2.0">Log in</a> (18+ only), then pick a princess to generate.
       {% endif %}
     </div>
   </div>
 </div>
 
 <script>
+  const PP2_COUNT = 10;
   const pp2LoggedIn = {{ 'true' if current_user.is_authenticated else 'false' }};
+  const pp2Adult = {{ 'true' if user_is_adult else 'false' }};
   let pp2Busy = false;
 
   function pp2ShowError(msg) {
@@ -165,7 +164,7 @@
     card.innerHTML = `
       <img src="${previewUrl}" alt="Preview" loading="lazy">
       <div class="pp2-card-foot">
-        <button type="button" class="pp2-dl-btn" onclick="pp2Download('${genId}', this)">⬇ Download Full Image</button>
+        <button type="button" class="pp2-dl-btn" onclick="pp2Download('${genId}', this)">Buy — 1 Credit</button>
         <span class="pp2-dl-hint">1 credit · hosted on percfectai.com</span>
       </div>`;
     grid.prepend(card);
@@ -179,31 +178,37 @@
     throw new Error(`Server error (${res.status})`);
   }
 
-  async function pp2Generate() {
+  async function pp2StartBatch() {
     if (!pp2LoggedIn) {
       pp2ShowError('Log in first. <a href="/login?next=/percfectpictures2.0" style="color:#c4b5fd">Log in →</a>');
+      return;
+    }
+    if (!pp2Adult) {
+      pp2ShowError('18+ only. <a href="/settings" style="color:#c4b5fd">Add your date of birth in Settings →</a>');
       return;
     }
     if (pp2Busy) return;
     pp2Busy = true;
 
-    const btn = document.getElementById('pp2-generate-btn');
     const princess = document.getElementById('pp2-princess').value;
-    btn.disabled = true;
     pp2HideError();
-    pp2ShowSkeletons(6);
-    pp2SetStatus(true, 'Generating 6 images and hosting on percfectai.com… (~1–2 min)');
+    pp2ShowSkeletons(PP2_COUNT);
+    pp2SetStatus(true, 'Generating 10 images on percfectai.com… (1–3 min)');
 
     try {
       const fd = new FormData();
       fd.append('princess', princess);
-      fd.append('count', '6');
-
-      const res = await fetch('/percfectstudios/perchance-generate', {
+      const res = await fetch('/percfectstudios/princess-batch', {
         method: 'POST', body: fd, credentials: 'same-origin',
       });
       const data = await pp2ParseJson(res);
-      if (!res.ok || data.error) throw new Error(data.error || 'Generation failed.');
+      if (!res.ok || data.error) {
+        if (res.status === 403 && data.needs_adult) {
+          pp2ShowError(`${data.error} <a href="/settings" style="color:#c4b5fd">Settings →</a>`);
+          return;
+        }
+        throw new Error(data.error || 'Generation failed.');
+      }
 
       pp2RemoveSkeletons();
       const items = data.results || [];
@@ -215,9 +220,9 @@
 
       if (!items.length) throw new Error('No images returned.');
 
-      pp2SetStatus(true, `✅ ${items.length} images hosted — tap Download on any card`);
+      pp2SetStatus(true, `✅ ${items.length} images hosted — tap Buy on any card`);
       if (data.partial_errors && data.partial_errors.length) {
-        pp2ShowError(`Got ${items.length}/6. Hit Generate again for more.`);
+        pp2ShowError(`Got ${items.length}/${PP2_COUNT}. Pick another princess to retry.`);
       }
     } catch (e) {
       pp2RemoveSkeletons();
@@ -229,13 +234,16 @@
       }
     } finally {
       pp2Busy = false;
-      btn.disabled = false;
     }
   }
 
   async function pp2Download(genId, btn) {
     if (!pp2LoggedIn) {
       window.location.href = '/login?next=/percfectpictures2.0';
+      return;
+    }
+    if (!pp2Adult) {
+      pp2ShowError('18+ only. <a href="/settings" style="color:#c4b5fd">Add your date of birth in Settings →</a>');
       return;
     }
     if (btn) { btn.disabled = true; btn.textContent = '…'; }
@@ -250,11 +258,14 @@
       const data = await pp2ParseJson(res);
 
       if (!res.ok || data.error) {
-        const msg = res.status === 402
-          ? `${data.error} <a href="/buy-credits" style="color:#c4b5fd">Buy credits →</a>`
-          : (data.error || 'Download failed.');
+        let msg = data.error || 'Download failed.';
+        if (res.status === 402) {
+          msg = `${data.error} <a href="/buy-credits" style="color:#c4b5fd">Buy credits →</a>`;
+        } else if (res.status === 403 && data.needs_adult) {
+          msg = `${data.error} <a href="/settings" style="color:#c4b5fd">Settings →</a>`;
+        }
         pp2ShowError(msg);
-        if (btn) { btn.disabled = false; btn.textContent = '⬇ Download Full Image'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Buy — 1 Credit'; }
         return;
       }
 
@@ -278,10 +289,10 @@
       } else {
         pp2ShowError(e.message || 'Download failed.');
       }
-      if (btn) { btn.disabled = false; btn.textContent = '⬇ Download Full Image'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Buy — 1 Credit'; }
     }
   }
 
-  document.getElementById('pp2-generate-btn').addEventListener('click', pp2Generate);
+  document.getElementById('pp2-princess').addEventListener('change', pp2StartBatch);
 </script>
 {% endblock %}

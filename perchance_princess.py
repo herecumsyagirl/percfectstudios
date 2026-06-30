@@ -6,8 +6,8 @@ from typing import Optional
 
 PERCHANCE_URL = "https://perchance.org/o3m0yoyo03"
 PERCHANCE_SLUG = "o3m0yoyo03"
-DEFAULT_COUNT = 6
-DEFAULT_SIZE = 960
+DEFAULT_COUNT = 10
+DEFAULT_SIZE = 768
 
 NEG_PROMPT = (
     "blurry, low quality, deformed, bad anatomy, extra limbs, childlike, "
@@ -153,6 +153,6 @@ def build_princess_prompt(princess_key: str, rng: Optional[random.Random] = None
 
 
 def build_princess_prompts(princess_key: str, count: int = DEFAULT_COUNT) -> list[str]:
-    count = max(1, min(6, int(count)))
+    count = max(1, min(10, int(count)))
     rng = random.Random()
     return [build_princess_prompt(princess_key, rng) for _ in range(count)]
