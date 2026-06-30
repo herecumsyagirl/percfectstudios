@@ -1,85 +1,110 @@
-=== PASTE INTO PERCHANCE → LISTS TAB ===
-URL: percfect-imagine
+<!--
+  👑 PERFECT PRINCESS GENERATOR
+  Generates 6 AI images based on a selected princess and random scenario variables.
+  Social features unlock after 4 generate clicks.
 
-fluxSchnell = {import:text-to-image-plugin}
+generateImage = {import:text-to-image-plugin}
 commentsPlugin = {import:comments-plugin}
-date = {import:date-plugin}
+generateInterfaceHTML = {import:t2i-framework-plugin-v2}
 
-title
-  Percfect Imagine – AI Art Studio
+settings
+  pageTitle = 👑 Percfect Princess Generator
+  introMessage = Choose your princess, then click Generate
+  numImages = 7
+  socialFeatures = button after 4 clicks
 
-$meta
-  title = Percfect Imagine – AI Art Studio
-  description = Free unlimited AI Flux image generation · Percfect Studios
-  header
-    mode = minimal
-    background = #0A0D14
+  imageOptions
+    prompt = [input.princess] [outfit] is seen in [location], [position] with [partner], GTA V loading screen art style, Stephen Bliss, Rockstar Games illustration, bold clean black outlines, vibrant saturated colors, dramatic cinematic lighting, sensual, masterpiece, best quality
+    negativePrompt = blurry, low quality, deformed, bad anatomy, extra limbs, childlike, underage, text, watermark, cartoon, painting
+    resolution = 768x768
+  userInputs
+    princess
+      label = 👑 Choose Your Princess
+      type = select
+      remember = true
+      options
+        Jasmine = Disney's slutty erotic princess Jasmine, Princess of Forbidden Desires
+        Ariel = Disney's slutty erotic princess Ariel the little red headed mermaid
+        Belle = Disney's slutty erotic princess Belle the Bound Beauty
+        Pocahontas = Disney's slutty erotic princess Pocahontas the savage indian whore
+        Megara = Disney's slutty erotic Megara from hercules
+        Esmeralda = Disney's slutty erotic princess Esmeralda the gypsy slut 
+        Mulan = Disney's slutty erotic asian princess Mulan 
+        Elsa = Disney's slutty erotic princess Elsa from 'Frozen' the Ice Queen of Cold Passion
+        Rapunzel = Disney's slutty erotic princessRapunzel the Tower-bound Fucktoy
+        Tiana = Disney's slutty erotic very tan princess Tiana
+        Aurora = Disney's slutty erotic princess Aurora aka 'sleeping beauty'
+    hiddenTrigger
+      type = hidden
+      random = true
 
-resolution = 768x768
-guidanceScale = 7
-seed = [""]
-batchCount = 10
+       outfit
+  completely naked except for a spiked collar, dog leash, and high heels
+  wearing a sheer slit-to-the-hip version of her classic outfit with nothing underneath
+  in a torn and revealing princess gown with her breasts spilling out and ass exposed
+  wearing a tiny g-string polka dot micro bikini that barely covers anything
+  translucent glowing lingerie that clings to every curve, completely see-through
+  leather boobless bodysuit with straps, thigh-high boots, and a chastity belt
+  covered head to toe in degrading dirty quotes and slurs written in permanent marker
+  full sex slave outfit with harness, nipple clamps, and ball gag
+  heavy shackles and chains on wrists and ankles, otherwise completely naked
+  black leather straps barely covering her nipples and pussy
+  only three pieces of electrical tape in X shapes over her nipples and pussy
+  tiny booty shorts and a cropped princess top that barely covers her underboob
+  wet and see-through white t-shirt with no bra and tiny thong
+  luxurious fur-lined cuffs and collar with a luxurious sheer babydoll lingerie
+  body painted with obscene Disney-themed tattoos and wearing only heels
+  micro skirt with no panties and a top that says 'Disney Whore' across her tits
+  fishnet bodystocking ripped in all the right places
+  princess tiara, thigh-high stockings, and nothing else
 
-animal
-  wolf
-  fox
-  cat
-  dragon
-  tiger
-  bear
-  eagle
-  serpent
+// ==================== RANDOM LISTS ====================
+location
+  in a kiddie pool
+  covered in cum 
+  knelt with [princess] in a circle of mens pennis's as they jerkoff
+  inside the glittering Palace of Agrabah at night
+  un a hammock
+  onn an office desk 
+  in the castle
+  on top of Pride Rock during a dramatic sunset
+  in the grand enchanted castle library with floating candles
+  in the mystical underwater grotto of Atlantica
+  inside the towering Notre Dame bell tower at midnight
+  deep in the lush jungle treehouse
+  inside the treasure-filled Cave of Wonders
+  aboard a magical flying carpet high above the desert
 
-negPr
-  (worst quality, low quality:1.4), by bad-artist-anime, by bad-artist, bad_prompt_version2, EasyNegative, ng_deepnegative_v1_75t, verybadimagenegative_v1.2, watermark, extra legs, extra hands, wrong anatomy, text, close up, cropped, out of frame, jpeg artifacts, ugly, duplicate, morbid, mutilated, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, malformed limbs, missing arms, missing legs, fused fingers, too many fingers, long neck
+position
+  riding cock passionately in cowgirl position with
+  being fucked hard in missionary position by
+  taken roughly from behind in doggy style position by
+  getting pounded deep annally dripping blood seen dripping from her asshole with
+  held in intensly sucking sick and gagging leaking fluid from heer lips while she gets facefucked  by
+  sitting riding face aggressively on top of 
+  lifted and fucked in carry position by 
+  passionately siccoring with [princess], and watched by 
+  69ing deeply with [pricess] and watched by
+  eating out [princess] while getting fucked by
 
-rDesc
-  portrait of {a|an} {mystical|futuristic|ancient} {import:animal}-{man|woman}, {starlet|celebrity|priest|model|cleaner|keeper|guardian|wanderer} of {the underworld|the seven worlds|light|darkness|jungle world|cybercrystal|blue fire|electrical storms|the deep heart|the overworld|luxury|dragonkind|forgotten realms|shifting sands|stormy seas}
-  {a|an} {cute|mischievous|majestic|powerful} {import:animal} x {import:animal} hybrid, {pokemon-like creature|legendary beast|fabled guardian}
-  {cyborg|steampunk|magical|bio-enhanced} {mermaid|merman|dolphin|octopus hybrid} exploring {a coral reef|an underwater city|underwater dunes|deep-sea ruins|bioluminescent caverns}
-  {steampunk|futuristic|ancient|cybernetic} explorer with {an airship|a hoverbike|a time-traveling artifact|a magical compass|a self-aware vehicle}
-  {graceful|agile|mysterious|enigmatic} {alien|human|robotic} dancer performing {on stage|in a street|in moonlight|in a zero-gravity chamber|in an enchanted ballroom}
-  {neon|sunset|moonlit|stormy} cityscape during {a rainstorm|a snowfall|a meteor shower|a festival of lights}
-  {magical|enchanted|cursed|forgotten} forest guarded by {giant mushrooms|sentient trees|whimsical spirits|ancient golems|shadow creatures}
-  {lonely|brave|curious|mysterious} lighthouse keeper with {a ghostly|an animal|a supernatural|an enchanted|a mechanical} companion
-  {haunted|abandoned|ancient|mystical} mansion inhabited by {quirky|creepy|kind|playful|mysterious} spirits
-  {futuristic|old-fashioned|magical|surreal} train racing through {a desert|a tundra|a jungle|a floating canyon|a volcanic wasteland}
-  {underwater|sky|space|ethereal} pirate captain with {a submarine|an airship|a spaceship|a magical ship|a bio-organic vessel}
-  {time-traveling|interdimensional|supernatural|cosmic} detective with {a pet dinosaur|a ghostly sidekick|a shape-shifting familiar|a psychic link}
-  {robotic|medieval|fantasy|shadowy} knight jousting on {a mechanical|a fire-breathing|a spectral|an elemental} horse
-  {ethereal|ancient|cosmic|divine} space goddess floating among {stars|nebulae|galaxies|cosmic storms|black holes}
-  {wise|ancient|intelligent|playful|ethereal} {tree|rock|cloud|wind} spirit with {a magical staff|a crystal orb|an enchanted flute|a glowing artifact}
-  {superhero|villain|antihero|renegade} with the ability to control {plants|weather|fire|shadows|time|gravity}
-  {flying|hovering|submersible|time-warping} car chase through {a futuristic|an underwater|a post-apocalyptic|an alien} city
-  {underwater|floating|hidden|crystal} cityscape lit by {bioluminescent plants|ancient crystals|magical torches|alien technology|mystical energy}
-  {mystical|cursed|prehistoric|frozen} cave with {glowing crystal|shimmering ice|luminescent fungus|otherworldly carvings|ancient artifacts}
-  {post-apocalyptic|futuristic|ancient|steampunk} wanderer with {a pet robot|a loyal animal companion|a supernatural guide|a mysterious artifact}
-  {masked|armored|stealthy|shadowy} vigilante perched {on a skyscraper|in a tree|atop a cliff|beside a glowing moon|in a thunderstorm}
-  {sorceress|witch|alchemist|mage} brewing {a potion|a spell|a concoction|a forbidden elixir} in {her hidden lair|a secret cave|an enchanted laboratory|an eerie tower}
-  {steampunk|cyberpunk|fantasy|bio-mechanical} inventor with {a mechanical|a magical|a sentient|a multi-dimensional} companion
-  {cyberpunk|interstellar|paranormal|digital} hacker in {a digital world|a secret network|an alternate reality|virtual cityscape|a hidden bunker}
-  {enchanted|fairy-tale|secret|ethereal} garden filled with {mythical|unusual|magical|living|singing} creatures
-  {cute|fierce|friendly|playful|intelligent} monster family {going on a picnic|exploring a forest|visiting a village|playing in the clouds|hiding in ruins}
-  {astronaut|alien|time-traveler|dimension-hopper} discovering {an alien oasis|a hidden planet|a realm beyond time|an uncharted galaxy}
-  {old-fashioned|modern|magical|surreal} {ice cream|candy|dessert} parlour with {magical|unusual|dangerous|transformative|healing} flavors
-  {abandoned|haunted|enchanted|dystopian} amusement park {reclaimed by nature|inhabited by spirits|guarded by creatures|lost in time|floating in space}
-  {warrior|sorceress|queen|mage-knight} riding {a mythical|a giant|an elemental|a shadowy|a radiant} beast
-  {vintage|retro|modern|otherworldly|surreal} circus with {supernatural|magical|dangerous|ethereal|living} performers
-  {otherworldly|majestic|mysterious|timeless} library filled with {ancient|enchanted|forbidden|cosmic|whispering} tomes
-  {intrepid|fearless|daring|visionary} explorer navigating {a perilous|a mysterious|an enchanted|a glowing|a hidden} jungle
-  {cozy|remote|enchanted|mystical} cottage in {the mountains|a forest|a magical realm|the clouds|a frozen tundra} with {magical|supernatural|ancient|odd|whimsical} neighbors
-  {street|stage|televised|cosmic} magician performing {a jaw-dropping|a dangerous|an enchanting|a mesmerizing|a reality-bending} illusion
-  {mighty|ancient|winged|cosmic} dragon {slumbering|guarding|hiding|flying over|battling in} {a hoard of treasure|enchanted crystals|cursed artifacts|a celestial battlefield|a ruined castle}
-  {chibi-style|cartoon|realistic|surreal|dreamlike} superheroes {saving the day|battling villains|protecting a city|training together|exploring space}
-  {whimsical|industrial|supernatural|mystical} factory where {dreams|nightmares|wishes|ideas|worlds} are manufactured
-  {space|intergalactic|time-traveling|dimensional} cowboy hunting {intergalactic outlaws|ancient threats|supernatural foes|rogue AIs|ethereal beings}
-  {necromancer|summoner|witch|elementalist} raising {an army of the undead|elemental creatures|magical beings|living shadows|spectral warriors}
-  {brave|cursed|legendary|eternal} warrior with {a haunted|an enchanted|a sentient|a cursed|a glowing} weapon
-  {interdimensional|cosmic|paranormal|otherworldly} {coffee|tea|dessert|alchemy} shop frequented by {odd|magical|alien|timeless|shapeshifting} patrons
-  {enchanted|bewitched|sacred|ancient|hidden} forest populated by {sentient|magical|cursed|playful|mystical} trees
-  {cybernetic|supernatural|mystical|celestial} musician creating {otherworldly|haunting|hypnotic|healing|transcendent} tunes
-  {alien|lost|ancient|futuristic} civilization thriving on {a floating island|a hidden continent|an undiscovered planet|a ring world|a dimensional plane}
-  Jasmine-inspired princess in {lingerie|a torn gown|a wet bikini} on a dark palace balcony, stormy sky, seductive gaze, 3D CGI
-  Ariel-inspired mermaid princess on moonlit rocks, {sheer|wet|glowing} outfit, ocean spray, cinematic lighting
-  Belle-inspired princess in {corset|candlelit bedroom|rose garden}, romantic atmosphere, glossy skin, 8k
-  Elsa-inspired ice queen in {sheer ice-blue gown|steam bath|throne room}, dramatic rim light, fantasy 3D
+partner
+  Jafar the dark sorcerer
+  Hades Lord of the Underworld
+  Ursula the squid woman
+  Gaston the arrogant hunter
+  Judge Claude Frollo the priest
+  The Beast from Beauty and the Beast
+  Shan Yu the ruthless conqueror
+  John smith the jamestown settler
+  Gaston the jacked guy with cleaved chin
+  Captain Hook 
+  Mr. Shmee
+  Corella Deville
+  
+  
+prompt
+  prompt = while [location] wearing [outfit], [input.princess] is [position] [partner] in an ultra-detailed, GTA 5 style, 3D Disney, Pixar style, hyper-realistic anime, concept art, masterpiece, best quality, 8k 
+  negativePrompt = blurry, low quality, deformed, bad anatomy, extra limbs, childlike, underage, text, watermark, cartoon, painting
+output
+  [image(prompt)]
+
