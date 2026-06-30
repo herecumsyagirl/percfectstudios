@@ -2401,5 +2401,11 @@ def perchance_unlock():
     return jsonify({"url": signed.get("signedURL") or signed.get("signed_url")})
 
 
+@app.route("/percfectpictures2.0")
+@app.route("/percfectpictures2")
+def percfect_pictures2():
+    return render_template("percfect_pictures2.html")
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
