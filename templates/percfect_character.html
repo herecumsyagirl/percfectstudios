@@ -71,12 +71,17 @@
           <img id="one-img" src="" alt="" />
         </div>
 
+        <div id="review-prompt-wrap" class="mt-3" style="display:none">
+          <label class="form-label">Tweak the prompt &amp; regenerate <span class="form-hint">edit this before building the other 3 shots</span></label>
+          <textarea class="form-control" id="review-prompt" rows="3" placeholder="Describe your character…"></textarea>
+        </div>
+
         <label class="form-label mt-3">Name your character</label>
         <input class="form-control" id="char-name" placeholder="e.g. Sir Galahad" maxlength="80" />
 
         <div class="review-row">
           <button class="btn-accent" style="flex:1" onclick="approveOne()">✓ Approve &amp; build all 4 shots</button>
-          <button class="btn-outline-accent" onclick="generateOne()">↻ Regenerate</button>
+          <button class="btn-outline-accent" onclick="regenFront()">↻ Regenerate</button>
         </div>
         <p class="credit-note">builds the other 3 shots (3 image credits) · the 360° spin comes after you approve all 4</p>
         <div id="review-err" class="gen-error" style="display:none"></div>
@@ -299,6 +304,16 @@ function loadFile(file){ if(!file.type.startsWith('image/')) return; state.file=
 
 /* ── Step 1: generate ONE shot ── */
 function generateOne(){ requireAuth(_generateOne); }
+// Regenerate the front shot, applying any edits made to the review prompt box.
+function regenFront(){
+  const rp=document.getElementById('review-prompt');
+  if(state.mode==='describe' && rp){
+    const v=rp.value.trim();
+    if(!v){ loudErr('review-err','Enter a prompt first.'); return; }
+    document.getElementById('desc').value=v;
+  }
+  generateOne();
+}
 function loudErr(id,msg){ err(id,msg); const e=document.getElementById(id); if(e) e.scrollIntoView({behavior:'smooth',block:'center'}); }
 async function _generateOne(){
   if(!state.gender){ loudErr('gen-err','Pick male or female first.'); return; }
@@ -323,6 +338,10 @@ async function _generateOne(){
     }
     state.candidate=data.url; state.prompt=data.prompt;
     img.src=data.url; img.style.display='block';
+    // Show the editable prompt box (describe mode) so they can tweak before building the rest.
+    const rpw=document.getElementById('review-prompt-wrap');
+    if(state.mode==='describe'){ document.getElementById('review-prompt').value=document.getElementById('desc').value; rpw.style.display=''; }
+    else { rpw.style.display='none'; }
     adjCredit('img-credits',-1);
   }catch(e){ loudErr('gen-err','Network error — please try again.'); hide('review-section'); }
   finally{ setBtn('gen-btn',false); document.getElementById('one-loading').classList.remove('show'); }
