@@ -751,7 +751,7 @@ def _current_user_is_adult() -> bool:
         return True
     res = supabase.table("users").select("is_adult,birthday").eq(
         "id", current_user.id
-    ).single().execute()
+    ).maybe_single().execute()
     data = res.data or {}
     if data.get("is_adult"):
         return True
@@ -1445,6 +1445,7 @@ def generate_video():
         return jsonify({"url": video_url, "type": "video"})
 
     except Exception as e:
+        app.logger.exception("princess-batch failed")
         return jsonify({"error": str(e)}), 500
 
 
