@@ -21,6 +21,7 @@ from perchance_princess import (
     DEFAULT_COUNT as PRINCESS_DEFAULT_COUNT,
     DEFAULT_SIZE as PRINCESS_DEFAULT_SIZE,
     NEG_PROMPT as PRINCESS_NEG_PROMPT,
+    normalize_princess_key,
     build_princess_prompts,
 )
 
@@ -2402,11 +2403,12 @@ def arena_generate():
 @login_required
 def perchance_generate():
     """Generate image(s) via Pollinations.ai (free). Returns blurred previews; charges no credits."""
-    princess_key = (request.form.get("princess") or "").strip()
+    princess_raw = (request.form.get("princess") or "").strip()
+    princess_key = normalize_princess_key(princess_raw) if princess_raw else ""
     prompt = (request.form.get("prompt") or "").strip()
 
     try:
-        if princess_key:
+        if princess_raw:
             count = min(6, max(1, int(request.form.get("count") or PRINCESS_DEFAULT_COUNT)))
             width = height = PRINCESS_DEFAULT_SIZE
             prompts = build_princess_prompts(princess_key, count)
@@ -2436,7 +2438,12 @@ def perchance_generate():
         if not results:
             return jsonify({"error": errors[0] if errors else "Generation failed."}), 500
 
-        payload = {"results": results, "source": "princess" if princess_key else "custom"}
+        payload = {
+            "results": results,
+            "source": "princess" if princess_raw else "custom",
+        }
+        if princess_raw:
+            payload["princess"] = princess_key
         if len(results) == 1:
             payload["preview_url"] = results[0]["preview_url"]
             payload["generation_id"] = results[0]["generation_id"]

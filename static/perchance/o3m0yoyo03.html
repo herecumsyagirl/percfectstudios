@@ -5722,10 +5722,29 @@
     return XS.apply(this, arguments);
   };
 
+  var PRINCESS_KEYS = ["Jasmine", "Ariel", "Belle", "Pocahontas", "Megara", "Esmeralda", "Mulan", "Elsa", "Rapunzel", "Tiana", "Aurora"];
+
+  function toPrincessKey(raw) {
+    raw = (raw || "").trim();
+    if (!raw) return "Jasmine";
+    for (var i = 0; i < PRINCESS_KEYS.length; i++) {
+      if (PRINCESS_KEYS[i] === raw || PRINCESS_KEYS[i].toLowerCase() === raw.toLowerCase()) return PRINCESS_KEYS[i];
+    }
+    var lower = raw.toLowerCase();
+    for (i = 0; i < PRINCESS_KEYS.length; i++) {
+      if (lower.indexOf(PRINCESS_KEYS[i].toLowerCase()) >= 0) return PRINCESS_KEYS[i];
+    }
+    if (lower.indexOf("meg from hercules") >= 0) return "Megara";
+    if (lower.indexOf("sleeping beauty") >= 0) return "Aurora";
+    return "Jasmine";
+  }
+
   function getPrincessName() {
     var sel = document.getElementById("princessInput") || document.querySelector("select");
-    if (sel && sel.options && sel.selectedIndex >= 0)
-      return (sel.options[sel.selectedIndex].text || "Jasmine").trim();
+    if (sel && sel.options && sel.selectedIndex >= 0) {
+      var opt = sel.options[sel.selectedIndex];
+      return toPrincessKey(opt.value || opt.text || "Jasmine");
+    }
     return "Jasmine";
   }
 
@@ -5735,7 +5754,9 @@
     var btn = t.id === "generateBtn" ? t : (t.closest ? t.closest("#generateBtn") : null);
     if (!btn && t.tagName === "BUTTON" && (t.textContent || "").indexOf("Generate") >= 0) btn = t;
     if (btn) {
-      try { window.parent.postMessage({ type: "percfect-studio-generate", princess: getPrincessName() }, "*"); } catch (e) {}
+      try {
+        window.parent.postMessage({ type: "percfect-studio-generate", princess: getPrincessName() }, "*");
+      } catch (e) {}
       setTimeout(scanDom, 3000);
       setTimeout(scanDom, 8000);
       setTimeout(scanDom, 20000);

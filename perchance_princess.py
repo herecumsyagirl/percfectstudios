@@ -96,13 +96,53 @@ PARTNERS = [
     "Mr. Smee",
 ]
 
+PRINCESS_KEYS = tuple(PRINCESSES.keys())
+PRINCESS_BY_LOWER = {name.lower(): name for name in PRINCESS_KEYS}
+DEFAULT_PRINCESS = "Jasmine"
+
+_LEGACY_ALIASES = {
+    "meg": "Megara",
+    "meg from hercules": "Megara",
+    "sleeping beauty": "Aurora",
+}
+
+
+def normalize_princess_key(raw: str) -> str:
+    """Resolve client princess id. Prefer canonical keys: Jasmine, Ariel, …"""
+    raw = (raw or "").strip()
+    if not raw:
+        return DEFAULT_PRINCESS
+    if raw in PRINCESSES:
+        return raw
+    by_lower = PRINCESS_BY_LOWER.get(raw.lower())
+    if by_lower:
+        return by_lower
+    return _normalize_princess_key_legacy(raw)
+
+
+def _normalize_princess_key_legacy(raw: str) -> str:
+    """Fallback when old clients send full Perchance option labels."""
+    lower = raw.lower()
+    for key, desc in PRINCESSES.items():
+        if raw == desc or lower == desc.lower():
+            return key
+    for key, desc in PRINCESSES.items():
+        desc_lower = desc.lower()
+        if desc_lower in lower or lower in desc_lower:
+            return key
+    for alias, key in _LEGACY_ALIASES.items():
+        if alias in lower:
+            return key
+    for key in sorted(PRINCESSES, key=len, reverse=True):
+        if key.lower() in lower:
+            return key
+    return DEFAULT_PRINCESS
+
 
 def build_princess_prompt(princess_key: str, rng: Optional[random.Random] = None) -> str:
     """Build one random prompt matching the Perchance generator logic."""
     r = rng or random
-    key = (princess_key or "Jasmine").strip()
-    if key not in PRINCESSES:
-        key = "Jasmine"
+    key = normalize_princess_key(princess_key)
     return PROMPT_TEMPLATE.format(
         location=r.choice(LOCATIONS),
         outfit=r.choice(OUTFITS),
