@@ -2287,9 +2287,14 @@ def arena_generate():
     if not prompt:
         return jsonify({"error": "Pick an interaction."}), 400
 
-    duration = 12 if len(ids) == 3 else 6
+    # User-chosen length (paid per second). xAI caps a single clip at 15s.
+    try:
+        duration = int(request.form.get("duration", 6))
+    except (TypeError, ValueError):
+        duration = 6
+    duration = max(5, min(15, duration))
     if not current_user.is_admin and user_data["video_credits"] < duration:
-        return jsonify({"error": f"This needs {duration} video seconds. Buy credits or redeem a coupon code."}), 402
+        return jsonify({"error": f"This needs {duration} video seconds — you have {user_data['video_credits']}. Buy credits or redeem a coupon code."}), 402
 
     cres = supabase.table("characters").select("*").in_("id", ids).eq("user_id", current_user.id).execute()
     rows = {str(c["id"]): c for c in (cres.data or [])}

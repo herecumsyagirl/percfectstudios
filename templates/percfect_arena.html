@@ -61,6 +61,15 @@
   </div>
 </div>
 
+<div class="container mb-4">
+  <p class="section-label">4 · Video length <span style="font-weight:400;color:var(--text-muted)">(you pay the seconds you pick)</span></p>
+  <div class="dur-chips">
+    <button class="dur-chip selected" data-sec="6" onclick="setDuration(6,this)">6s</button>
+    <button class="dur-chip" data-sec="10" onclick="setDuration(10,this)">10s</button>
+    <button class="dur-chip" data-sec="15" onclick="setDuration(15,this)">15s</button>
+  </div>
+</div>
+
 <div class="container mb-6">
   <button class="generate-btn generate-btn-video" id="arena-btn" onclick="generateArena()" disabled>
     <span class="btn-text">▶ Generate interaction</span>
@@ -124,6 +133,10 @@
 .bg-mode:hover { border-color:var(--accent); }
 .bg-mode.selected { border-color:var(--accent); background:var(--accent); color:#fff; }
 .bg-input { margin-top:.2rem; }
+.dur-chips { display:flex; gap:.5rem; flex-wrap:wrap; }
+.dur-chip { padding:.55rem 1.2rem; border-radius:99px; border:1px solid var(--border-2); background:var(--bg-3); color:var(--text); font-weight:700; font-size:.9rem; cursor:pointer; transition:all .15s; }
+.dur-chip:hover { border-color:var(--accent); }
+.dur-chip.selected { border-color:var(--accent); background:var(--accent); color:#fff; }
 
 .generate-btn { width:100%; padding:.75rem; border-radius:14px; border:none; cursor:pointer; background:linear-gradient(135deg,#3d6ee8,#2a4fcf); color:#fff; font-size:1rem; font-weight:700; font-family:var(--font-main); transition:all .2s; margin-bottom:.5rem; box-shadow:0 4px 24px rgba(61,110,232,.3); }
 .generate-btn:hover { transform:translateY(-2px); box-shadow:0 8px 32px rgba(61,110,232,.45); }
@@ -202,6 +215,13 @@ function selectAction(key){
   document.getElementById('action-'+key).classList.add('selected');
   updateCost();
 }
+let selectedDuration = 6;
+function setDuration(sec, el){
+  selectedDuration = sec;
+  document.querySelectorAll('.dur-chip').forEach(c=>c.classList.remove('selected'));
+  if(el) el.classList.add('selected');
+  updateCost();
+}
 function updateCost(){
   const btn=document.getElementById('arena-btn');
   const note=document.getElementById('arena-cost');
@@ -209,10 +229,7 @@ function updateCost(){
   const ready = n>=2 && n<=3 && selectedAction;
   btn.disabled=!ready;
   if(n<2){ note.textContent='Pick 2–3 characters and an interaction'; return; }
-  const cost = n===3?12:6;
-  note.innerHTML = n===3
-    ? `3-way interaction — <strong>${cost} video seconds</strong> (extra)`
-    : `${cost} video seconds`;
+  note.innerHTML = `<strong>${selectedDuration} video seconds</strong>`;
 }
 
 let bgMode='none', bgFile=null;
@@ -245,6 +262,7 @@ async function _generateArena(){
   const fd=new FormData();
   fd.append('character_ids',selected.join(','));
   fd.append('action',selectedAction);
+  fd.append('duration',selectedDuration);
   fd.append('bg_mode',bgMode);
   if(bgMode==='preset'){ fd.append('bg_preset',document.getElementById('bg-preset').value); }
   else if(bgMode==='text'){ fd.append('bg_text',document.getElementById('bg-text').value.trim()); }
@@ -258,7 +276,7 @@ async function _generateArena(){
     document.getElementById('arena-dl').href=data.url;
     document.getElementById('arena-actions').style.display='flex';
     v.play().catch(()=>{});
-    const vc=document.getElementById('vid-credits'); if(vc){ const n=parseInt(vc.textContent); if(!isNaN(n)) vc.textContent=Math.max(0,n-(selected.length===3?12:6)); }
+    const vc=document.getElementById('vid-credits'); if(vc){ const n=parseInt(vc.textContent); if(!isNaN(n)) vc.textContent=Math.max(0,n-selectedDuration); }
   }catch(e){ err('Network error — please try again.'); }
   finally{ btn.disabled=false; btn.querySelector('.btn-text').style.display=''; btn.querySelector('.btn-spinner').style.display='none'; stopProgress(); updateCost(); }
 }
