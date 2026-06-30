@@ -268,7 +268,7 @@
 <script>
 const LOGGED_IN = {{ 'true' if user else 'false' }};
 let canDownload = {{ 'true' if user and user.has_purchased else 'false' }};
-const state = { gender:null, mode:'describe', file:null, candidate:null, prompt:null };
+const state = { gender:null, mode:'describe', file:null, candidate:null, prompt:null, busy:false };
 let editGender = null;
 let finTimer = null;
 
@@ -349,8 +349,12 @@ async function _generateOne(){
 
 /* ── Step 2: approve → build the other 3 + 360 ── */
 function approveOne(){ requireAuth(_approveOne); }
+function setReviewDisabled(on){ document.querySelectorAll('#review-section .review-row button').forEach(b=>{ b.disabled=on; }); }
+function endApprove(){ state.busy=false; setReviewDisabled(false); stopFinProgress(); }
 async function _approveOne(){
   if(!state.candidate){ err('review-err','Generate a shot first.'); return; }
+  if(state.busy){ return; }                 // guard: a double-click was creating 2 characters
+  state.busy=true; setReviewDisabled(true);
   hide('review-err'); hide('fin-err');
   startFinProgress('Building the other 3 shots…');
 
@@ -365,7 +369,7 @@ async function _approveOne(){
   try{
     const res=await fetch('/studios/percfectcharacter/finalize',{method:'POST',body:fd});
     let data; try { data = await res.json(); } catch(_e) { data = {}; }
-    if(!res.ok){ loudErr('fin-err',data.error||('Build failed (HTTP '+res.status+').')); stopFinProgress(); return; }
+    if(!res.ok){ loudErr('fin-err',data.error||('Build failed (HTTP '+res.status+').')); endApprove(); return; }
     hide('review-section');
     renderFinalShots(data.images||[]);
     show('final-section');
@@ -379,11 +383,11 @@ async function _approveOne(){
     state.savedId = data.character.id;
     state.shots = data.images || [];
     loadRoster();
-  }catch(e){ loudErr('fin-err','Network error — please try again.'); stopFinProgress(); return; }
+  }catch(e){ loudErr('fin-err','Network error — please try again.'); endApprove(); return; }
 
   // Stop here: the 360° spin is now gated behind approval (approveSpin),
   // and "no" opens the edit-prompt box instead.
-  stopFinProgress();
+  endApprove();
 }
 
 /* ── Approved → run the 360° spin ── */
