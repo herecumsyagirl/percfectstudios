@@ -81,6 +81,14 @@
     font-size: 0.75rem; color: var(--text-muted); padding: 0.5rem 1rem;
     border-top: 1px solid var(--border-2); display: none;
   }
+  .pp2-skeleton .pp2-skel-img {
+    width: 100%; aspect-ratio: 1; background: linear-gradient(90deg, var(--bg-3) 25%, var(--bg-2) 50%, var(--bg-3) 75%);
+    background-size: 200% 100%; animation: pp2-shimmer 1.2s infinite;
+  }
+  @keyframes pp2-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
 </style>
 
 <div class="pp2-wrap">
@@ -171,6 +179,52 @@
     if (text) cap.textContent = text;
   }
 
+  function pp2ShowSkeletons(n) {
+    pp2ClearEmpty();
+    const grid = document.getElementById('pp2-grid');
+    for (let i = 0; i < n; i++) {
+      const sk = document.createElement('div');
+      sk.className = 'pp2-card pp2-skeleton';
+      sk.innerHTML = '<div class="pp2-skel-img"></div>';
+      grid.appendChild(sk);
+    }
+  }
+
+  function pp2RemoveSkeletons() {
+    document.querySelectorAll('.pp2-skeleton').forEach(el => el.remove());
+  }
+
+  async function pp2ParseJson(res) {
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    if (ct.includes('application/json')) {
+      return res.json();
+    }
+    if (res.status === 401 || res.status === 302) {
+      throw new Error('LOG_IN');
+    }
+    const text = await res.text();
+    if (text.includes('Redirecting') || text.includes('/login')) {
+      throw new Error('LOG_IN');
+    }
+    throw new Error(`Server error (${res.status})`);
+  }
+
+  async function pp2PostGenerate(princess, count) {
+    const fd = new FormData();
+    fd.append('princess', princess);
+    fd.append('count', String(count));
+    const res = await fetch('/percfectstudios/perchance-generate', {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+    });
+    const data = await pp2ParseJson(res);
+    if (!res.ok || data.error) {
+      throw new Error(data.error || 'Generation failed.');
+    }
+    return data;
+  }
+
   async function pp2Capture(imageUrl, imageData) {
     {% if not current_user.is_authenticated %}
     pp2ShowError('Log in to save previews. <a href="/login?next=/percfectpictures2.0" style="color:#c4b5fd">Log in →</a>');
@@ -187,8 +241,10 @@
       if (imageData) fd.append('image_data', imageData);
       else fd.append('image_url', imageUrl);
 
-      const res = await fetch('/percfectstudios/preview-capture', { method: 'POST', body: fd });
-      const data = await res.json();
+      const res = await fetch('/percfectstudios/preview-capture', {
+        method: 'POST', body: fd, credentials: 'same-origin',
+      });
+      const data = await pp2ParseJson(res);
 
       if (!res.ok || data.error) {
         pp2ShowError(data.error || 'Could not save preview.');
@@ -199,7 +255,11 @@
       pp2RenderPreview(data.preview_url, data.generation_id);
       pp2HideError();
     } catch (e) {
-      pp2ShowError('Network error — try again.');
+      if (e.message === 'LOG_IN') {
+        pp2ShowError('Session expired. <a href="/login?next=/percfectpictures2.0" style="color:#c4b5fd">Log in →</a>');
+      } else {
+        pp2ShowError(e.message || 'Network error — try again.');
+      }
     } finally {
       pp2Pending.delete(key);
       if (!pp2Pending.size) pp2SetCapturing(false);
@@ -213,31 +273,52 @@
     {% endif %}
 
     pp2HideError();
-    pp2SetCapturing(true, '⏳ Generating previews…');
+    pp2ShowSkeletons(6);
+    pp2SetCapturing(true, '⏳ Generating previews… (0/6)');
 
-    try {
-      const fd = new FormData();
-      fd.append('princess', princess || 'Jasmine');
-      fd.append('count', '6');
+    const princessKey = princess || 'Jasmine';
+    let done = 0;
+    let saved = 0;
+    const batchErrors = [];
 
-      const res = await fetch('/percfectstudios/perchance-generate', { method: 'POST', body: fd });
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        pp2ShowError(data.error || 'Generation failed — try again.');
-        return;
+    const tasks = Array.from({ length: 6 }, () => (async () => {
+      try {
+        const data = await pp2PostGenerate(princessKey, 1);
+        const items = data.results || [{ preview_url: data.preview_url, generation_id: data.generation_id }];
+        for (const item of items) {
+          if (item.preview_url && item.generation_id) {
+            pp2RenderPreview(item.preview_url, item.generation_id);
+            saved++;
+          }
+        }
+        if (data.partial_errors && data.partial_errors.length) {
+          batchErrors.push(...data.partial_errors);
+        }
+      } catch (e) {
+        batchErrors.push(e.message || 'Generation failed.');
+      } finally {
+        done++;
+        pp2SetCapturing(true, `⏳ Generating previews… (${done}/6)`);
       }
+    })());
 
-      const items = data.results || [{ preview_url: data.preview_url, generation_id: data.generation_id }];
-      items.forEach(item => pp2RenderPreview(item.preview_url, item.generation_id));
+    await Promise.allSettled(tasks);
+    pp2RemoveSkeletons();
+    pp2SetCapturing(false);
 
-      if (data.partial_errors && data.partial_errors.length) {
-        pp2ShowError('Some images failed — partial batch saved.');
+    if (!saved) {
+      if (batchErrors.some(m => m === 'LOG_IN' || (m && m.includes('Log in')))) {
+        pp2ShowError('Session expired. <a href="/login?next=/percfectpictures2.0" style="color:#c4b5fd">Log in →</a>');
+      } else {
+        pp2ShowError(batchErrors[0] || 'Generation failed — try again.');
       }
-    } catch (e) {
-      pp2ShowError('Network error — try again.');
-    } finally {
-      pp2SetCapturing(false);
+      return;
+    }
+
+    if (batchErrors.length) {
+      pp2ShowError(`Saved ${saved}/6 previews. Some images failed — try Generate again.`);
+    } else {
+      pp2HideError();
     }
   }
 
@@ -272,8 +353,10 @@
     try {
       const fd = new FormData();
       fd.append('generation_id', genId);
-      const res = await fetch('/percfectstudios/preview-unlock', { method: 'POST', body: fd });
-      const data = await res.json();
+      const res = await fetch('/percfectstudios/preview-unlock', {
+        method: 'POST', body: fd, credentials: 'same-origin',
+      });
+      const data = await pp2ParseJson(res);
 
       if (!res.ok || data.error) {
         const msg = res.status === 402
@@ -298,7 +381,11 @@
         countEl.textContent = Math.max(0, n - 1) + ' credits';
       }
     } catch (e) {
-      pp2ShowError('Network error.');
+      if (e.message === 'LOG_IN') {
+        window.location.href = '/login?next=/percfectpictures2.0';
+      } else {
+        pp2ShowError(e.message || 'Network error.');
+      }
       if (btn) { btn.disabled = false; btn.textContent = '🔓 Unlock — 1 Credit'; }
     }
   }

@@ -346,6 +346,16 @@ login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
 
+@login_manager.unauthorized_handler
+def _unauthorized():
+    """Return JSON for studio API calls instead of an HTML login redirect."""
+    if request.path.startswith("/percfectstudios/") or request.accept_mimetypes.best_match(
+        ["application/json", "text/html"]
+    ) == "application/json":
+        return jsonify({"error": "Log in to continue."}), 401
+    return redirect(url_for("login", next=request.path))
+
+
 class User(UserMixin):
     def __init__(self, data):
         self.id = data["id"]
@@ -2428,9 +2438,23 @@ def perchance_generate():
 
         results = []
         errors = []
-        for item_prompt in prompts:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def _download_prompt(item_prompt: str) -> tuple[str, bytes]:
+            return item_prompt, _generate_perchance(item_prompt, width, height, neg)
+
+        workers = min(3, len(prompts))
+        downloaded: list[tuple[str, bytes]] = []
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [pool.submit(_download_prompt, p) for p in prompts]
+            for fut in as_completed(futures):
+                try:
+                    downloaded.append(fut.result())
+                except Exception as item_err:
+                    errors.append(str(item_err))
+
+        for item_prompt, image_bytes in downloaded:
             try:
-                image_bytes = _generate_perchance(item_prompt, width, height, neg)
                 results.append(_perchance_store_generation(item_prompt, image_bytes))
             except Exception as item_err:
                 errors.append(str(item_err))
