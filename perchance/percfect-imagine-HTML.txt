@@ -1,206 +1,137 @@
-=== PASTE INTO PERCHANCE → HTML TAB ===
-(same generator: percfect-imagine)
+-->
 
-generateInterfaceHTML = {import:t2i-framework-plugin-v2}
+<h1>👑 PERFECT PRINCESS GENERATOR</h1>
+<p style="margin:1em auto; padding:0 1em; max-width:700px;">Choose your princess, then click Generate</p>
 
-settings
-  pageTitle = ✦ Percfect Imagine
-  introMessage = Pick a princess, outfit, pose & scene — hit <b>Generate</b>. <b>10 images</b> per batch, free. Animate at <a href="https://percfectai.com/app" target="_blank">percfectai.com/app</a> (480p video).
-  numImages = 10
-  randomDescription = rDesc
-  socialFeatures = true
-  showFeedback = false
-  imageButtons = download, copyPrompt, fullscreen
-  imageOptions
-    prompt = [input.stylePick], [input.princessPick], wearing [input.hotWear] and [input.topWear], [input.expression], [input.pose], in [input.scenePick], [input.description], masterpiece, best quality, sharp focus, highly detailed 3D CGI, cinematic lighting, glossy skin, 8k
-    negativePrompt = [negPr]
-    resolution = [input.shape]
-    guidanceScale = [guidanceScale]
-    seed = [seed]
-  userInputs
-    princessPick
-      label = 👑 Princess
-      type = select
-      default = Jasmine
-      options
-        Ariel
-          value = Ariel-inspired mermaid princess, flowing vibrant red hair, seashell crown, ocean sparkle
-        Belle
-          value = Belle-inspired princess, golden ball gown, warm brown hair, elegant bookish charm
-        Jasmine
-          value = Jasmine-inspired princess, teal outfit, long black hair, Arabian palace aesthetic
-        Rapunzel
-          value = Rapunzel-inspired princess, impossibly long golden braid, purple dress, lantern glow
-        Elsa
-          value = Elsa-inspired ice queen princess, shimmering blue gown, snowflake magic, platinum braid
-        Aurora
-          value = Aurora-inspired sleeping beauty princess, pink flowing gown, soft rose-gold hair
-        Cinderella
-          value = Cinderella-inspired princess, sparkling blue ball gown, glass slippers, midnight magic
-        Moana
-          value = Moana-inspired island princess, ocean waves, bold spirit, tropical flower accents
-        Tiana
-          value = Tiana-inspired princess, emerald green gown, New Orleans elegance, warm golden lighting
-        Mulan
-          value = Mulan-inspired warrior princess, crimson and gold, fierce grace, cherry blossom petals
-        Original
-          value = original fantasy princess, unique crown and gown, striking beauty
-    hotWear
-      label = 🔥 Spicy / outfit
-      type = select
-      default = Slit gown
-      options
-        Slit gown
-          value = high-slit silk gown, bare thigh, plunging neckline
-        Lingerie set
-          value = delicate lace lingerie set, garter straps, sheer fabric
-        Bikini
-          value = skimpy metallic bikini, wet glossy skin, beach glam
-        Torn dress
-          value = torn royal gown, ripped fabric, exposed shoulder and leg
-        Corset only
-          value = tight lace corset, stockings, no skirt, bedroom lighting
-        Sheer robe
-          value = sheer silk robe falling open, nothing underneath, candlelit
-        Wet white shirt
-          value = soaked white shirt clinging to body, no bra, rain soaked
-        Bondage silk
-          value = silk ribbons wrapped around body, artistic restraint, sensual
-        Maid outfit
-          value = frilly black maid outfit, very short skirt, thigh highs
-        None extra
-          value = wearing only what the gown provides, elegant but revealing
-    topWear
-      label = Top / upper
-      type = select
-      options
-        Off-shoulder
-          value = off-shoulder top, bare collarbones
-        Crop top
-          value = tiny crop top, midriff exposed
-        Corset top
-          value = structured corset top, pushed-up cleavage
-        Bare shoulders
-          value = gown slipped off shoulders, décolletage
-        Chain harness
-          value = delicate gold chain harness over bare skin
-        Normal gown
-          value = fitted bodice of royal gown
-    expression
-      label = Expression
-      type = select
-      options
-        Seductive smile
-          value = seductive half-smile, bedroom eyes, parted lips
-        Innocent blush
-          value = innocent wide eyes, soft blush, shy glance
-        Confident smirk
-          value = confident smirk, direct eye contact, powerful gaze
-        Pleasure
-          value = eyes half-closed, lips parted, expression of pleasure
-        Surprised
-          value = surprised gasp, wide eyes, hand near mouth
-        Fierce
-          value = fierce determined stare, battle-ready intensity
-        Dreamy
-          value = dreamy distant gaze, soft romantic mood
-    pose
-      label = Pose
-      type = select
-      options
-        Standing portrait
-          value = standing full body portrait, hand on hip
-        Sitting throne
-          value = sitting on throne, legs crossed, regal posture
-        Lying down
-          value = lying on silk sheets, arched back, relaxed sensual pose
-        On knees
-          value = on knees, looking up, submissive elegant pose
-        Bent over
-          value = bent forward slightly, looking back over shoulder
-        Dancing
-          value = mid-dance pose, flowing hair and fabric motion
-        Pool edge
-          value = sitting at pool edge, feet in water, leaning back on hands
-        Balcony
-          value = leaning on balcony railing, wind in hair, city behind
-    scenePick
-      label = Scene / location
-      type = select
-      options
-        Castle ballroom
-          value = inside a grand fairy tale castle ballroom with crystal chandeliers
-        Enchanted forest
-          value = enchanted forest clearing with glowing fireflies and magical mist
-        Rose garden
-          value = royal rose garden at golden hour with butterflies and soft petals
-        Moonlit ocean
-          value = moonlit ocean shore with bioluminescent waves and starry sky
-        Royal ballroom
-          value = lavish palace ballroom during a royal celebration
-        Throne room
-          value = ornate throne room with stained glass windows and velvet banners
-        Dark palace
-          value = dark palace balcony with villain silhouette, stormy sky, Jafar aesthetic
-        Bedroom
-          value = luxurious canopy bed, silk sheets, warm candlelight
-        Steam bath
-          value = marble steam bath, fog, water droplets on skin
-        Neon alley
-          value = neon-lit cyberpunk alley, rain, reflective puddles
-    stylePick
-      label = Art style
-      type = select
-      default = 3D CGI
-      options
-        3D CGI
-          value = highly detailed 3D CGI render, cinematic volumetric lighting, ultra realistic skin texture, Grok Imagine 3D style, 8k masterpiece
-        Cinematic Photo
-          value = cinematic 8k photorealistic, dramatic lighting, shallow depth of field
-        Anime
-          value = anime illustration style, vibrant colors, clean linework, studio quality
-        Dark Fantasy
-          value = epic dark fantasy art, painterly brushstrokes, dramatic rim lighting
-        Cyberpunk
-          value = neon cyberpunk, rain-soaked streets, holographic glow
-    description
-      label = Extra details (optional)
-      type = paragraph
-      placeholder = Add anything… wet skin, specific lighting, camera angle…
-      useVariables = true
-      enterKeyTriggersGeneration = true
-    shape
-      label = Image shape
-      type = select
-      default = Square 768
-      options
-        Square 768
-          value = 768x768
-        Portrait
-          value = 768x1024
-        Landscape
-          value = 1024x768
-    numImages
-      label = Images per batch
-      type = select
-      default = 10
-      options
-        5
-          value = 5
-        10
-          value = 10
-        15
-          value = 15
-        20
-          value = 20
-  galleryOptions
-    gallery = true
-    sort = recent
-    contentFilter = none
-    style = background:#12121c; border:1px solid #2a2a40; border-radius:12px; padding:16px; max-width:1100px; margin:20px auto;
-  underImagesMessage
-    <div style="max-width:1100px;margin:24px auto;padding:20px;background:linear-gradient(135deg,#1a1030,#0d0d18);border:1px solid #3d2d6b;border-radius:16px;text-align:center;font-family:system-ui,sans-serif;">
-      <div style="font-size:1.1rem;font-weight:800;color:#c4b5fd;margin-bottom:8px;">🎬 Animate this image</div>
-      <p style="color:#8b8bb8;font-size:0.85rem;line-height:1.6;margin-bottom:12px;">Right-click any image → copy address → <a href="https://percfectai.com/app" style="color:#9b7bff;">percfectai.com/app</a> → MY PICS → ANIMATE (480p)</p>
-      <a href="https://percfectai.com/app" target="_blank" style="display:inline-block;padding:12px 28px;background:#7c5cfc;color:#fff;border-radius:10px;text-decoration:none;font-weight:700;">Open Percfect App →</a>
-    </div>
+<div style="margin:1em auto; max-width:700px;">
+  <label for="princessInput" style="font-size:1.1em; font-weight:bold;">👑 Choose Your Princess</label><br>
+  <select id="princessInput" style="font-size:1em; padding:0.4em; margin-top:0.5em; min-width:260px;">
+    <option value="Disney's slutty erotic princess Jasmine, Princess of Forbidden Desires">Jasmine</option>
+    <option value="Disney's slutty erotic princess Ariel the little red headed mermaid">Ariel</option>
+    <option value="Disney's slutty erotic princess Belle the Bound Beauty">Belle</option>
+    <option value="Disney's slutty erotic princess Pocahontas the savage native american feather in hair, indian whore">Pocahontas</option>
+    <option value="Disney's slutty erotic Meg from Hercules">Megara</option>
+    <option value="Disney's slutty erotic princess Esmeralda the gypsy slut">Esmeralda</option>
+    <option value="Disney's slutty erotic asian princess Mulan">Mulan</option>
+    <option value="Disney's slutty erotic princess Elsa from 'Frozen' the Ice Queen of Cold Passion">Elsa</option>
+    <option value=" Rapunzel = Disney's slutty erotic princess Rapunzel the Tower-bound, green eyed, blonde extremely long hair (leash), Rapunzel ">Rapunzel</option>
+    <option value="Disney's slutty erotic very tan black girl, cock loving green wearing whore princess Tiana">Tiana</option>
+    <option value="Disney's slutty erotic princess Aurora aka 'sleeping beauty'">Aurora</option>
+  </select>
+  <br><br>
+  <button id="generateBtn" onclick="generateAll()" style="font-size:1.1em; padding:0.5em 1.5em; cursor:pointer;">✨ Generate</button>
+</div>
+
+<div id="imageGridCtn" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:1em; max-width:1200px; margin:1.5em auto; padding:0 1em;"></div>
+
+<div style="margin:2em auto; max-width:700px;">
+  <button id="socialBtn" hidden onclick="openSocial()" style="font-size:1em; padding:0.5em 1em; cursor:pointer;">🗨️ Community Chat</button>
+  <div id="commentsCtn" hidden style="margin-top:1em;"></div>
+</div>
+
+<style>
+  html { color-scheme: light dark; }
+  body { text-align:center; }
+  .slot { background:#222; min-height:240px; display:flex; align-items:center; justify-content:center; border-radius:8px; overflow:hidden; }
+  .slot img { width:100%; height:100%; object-fit:cover; display:block; }
+  .slot .loading { color:#aaa; font-size:0.9em; padding:1em; }
+</style>
+
+<script>
+  let generateCount = 0;
+  let pick = a => a[Math.floor(Math.random() * a.length)];
+
+  // ==================== RANDOM LISTS ====================
+
+  let locations = [
+    "inside the glittering Palace of Agrabah at night",
+    "on top of Pride Rock during a dramatic sunset",
+    "in the grand enchanted castle library with floating candles",
+    "in the mystical underwater grotto of Atlantica",
+    "inside the towering Notre Dame bell tower at midnight",
+    "deep in the lush jungle treehouse",
+    "inside the treasure-filled Cave of Wonders",
+    "aboard a magical flying carpet high above the desert",
+    "in a kiddie pool",
+    "on an office desk",
+    "in the castle"
+  ];
+
+  let outfits = [
+    "wearing a sheer slit-to-the-hip version of her classic outfit with nothing underneath",
+    "in a torn and revealing princess gown with breasts spilling out",
+    "nothing at all completely naked except for her spiked collar and dog leash",
+    "g string polka dotted micro bikini",
+    "translucent glowing lingerie that clings to every curve",
+    "leather boobless bodysuit with thigh-high boots",
+    "covered in degrading quotes written in marker",
+    "sex slave outfit with shackles and chains",
+    "black leather straps",
+    "3 pieces of electrical tape in form of an X as nipple pasties and vagina covering"
+  ];
+
+  let positions = [
+    "riding cock passionately in cowgirl position with",
+    "being fucked hard in missionary position by",
+    "taken roughly from behind in doggy style position by",
+    "getting pounded deep anally with cum and blood dripping from her asshole by",
+    "held intensely sucking dick and gagging with fluid leaking from her lips while getting facefucked by",
+    "sitting riding face aggressively on top of",
+    "lifted and fucked in carry position by",
+    "passionately scissoring with another princess while watched by",
+    "69ing deeply with another princess while watched by",
+    "eating out another princess while getting fucked by"
+  ];
+
+  let partners = [
+    "Jafar the dark sorcerer",
+    "Hades Lord of the Underworld",
+    "Ursula the squid woman",
+    "Gaston the arrogant hunter",
+    "Judge Claude Frollo the priest",
+    "The Beast from Beauty and the Beast",
+    "Shan Yu the ruthless conqueror",
+    "John Smith the Jamestown settler",
+    "Captain Hook",
+    "Mr. Smee"
+  ];
+
+  if (localStorage.princess) princessInput.value = localStorage.princess;
+  princessInput.onchange = () => localStorage.princess = princessInput.value;
+
+  async function generateAll() {
+    generateBtn.disabled = true;
+    if (++generateCount >= 4) socialBtn.hidden = false;
+
+    imageGridCtn.innerHTML = "";
+    let slots = [];
+    for (let i = 0; i < 6; i++) {
+      let slot = document.createElement("div");
+      slot.className = "slot";
+      slot.innerHTML = `<span class="loading">⏳ Generating...</span>`;
+      imageGridCtn.appendChild(slot);
+      slots.push(slot);
+    }
+
+    let princess = princessInput.value;
+    let negPrompt = "blurry, low quality, deformed, bad anatomy, extra limbs, childlike, underage, text, watermark, cartoon, painting";
+
+    let jobs = [...Array(6)].map((_, i) => {
+      let prompt = `while ${pick(locations)} wearing ${pick(outfits)}, ${princess} is ${pick(positions)} ${pick(partners)} in an ultra-detailed, GTA 5 style, 3D Disney, concept art, masterpiece, best quality, 8k`;
+      return generateImage(prompt, {resolution: "768x768", negativePrompt: negPrompt}).then(url => {
+        slots[i].innerHTML = `<img src="${url}" alt="generated ${i + 1}">`;
+      }).catch(_ => {
+        slots[i].innerHTML = `<span class="loading" style="color:red;">Error</span>`;
+      });
+    });
+
+    await Promise.all(jobs);
+    generateBtn.disabled = false;
+  }
+
+  function openSocial() {
+    socialBtn.hidden = true;
+    commentsCtn.hidden = false;
+    commentsCtn.innerHTML = commentsPlugin({channel: "perfect-princess", width: "100%", height: "400px"});
+  }
+</script>
