@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, g, session, Response
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, g, session, Response, send_from_directory
 from urllib.parse import urlparse
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -14,6 +14,15 @@ import stripe
 from io import BytesIO
 from PIL import Image, ImageOps
 from dotenv import load_dotenv
+
+from perchance_princess import (
+    PERCHANCE_URL as PRINCESS_PERCHANCE_URL,
+    PRINCESSES,
+    DEFAULT_COUNT as PRINCESS_DEFAULT_COUNT,
+    DEFAULT_SIZE as PRINCESS_DEFAULT_SIZE,
+    NEG_PROMPT as PRINCESS_NEG_PROMPT,
+    build_princess_prompts,
+)
 
 # Let Pillow decode iPhone HEIC/HEIF photos. Safe no-op if the package
 # is unavailable for some reason (we still handle JPEG/PNG/WebP natively).
@@ -415,23 +424,48 @@ def _get_form_image_url():
     return image_url
 
 
-def _generate_perchance(prompt: str, width: int = 1024, height: int = 1024) -> bytes:
+def _generate_perchance(
+    prompt: str,
+    width: int = 1024,
+    height: int = 1024,
+    negative_prompt: str = "",
+) -> bytes:
     """Call Pollinations.ai (free backend Perchance uses) and return raw JPEG bytes."""
     import urllib.parse
     width = max(512, min(1536, int(width)))
     height = max(512, min(1536, int(height)))
     encoded = urllib.parse.quote(prompt, safe='')
+    neg = urllib.parse.quote(negative_prompt or "", safe='')
     url = (
         f"https://image.pollinations.ai/prompt/{encoded}"
         f"?width={width}&height={height}&nologo=true&model=flux&seed=-1"
     )
-    resp = requests.get(url, timeout=90)
+    if neg:
+        url += f"&negative={neg}"
+    resp = requests.get(url, timeout=120)
     if not resp.ok:
         raise Exception(f"Image generation error {resp.status_code}")
     return resp.content
 
 
-def _perchance_store_generation(prompt: str, image_bytes: bytes) -> dict:
+def _is_allowed_perchance_image_url(url: str) -> bool:
+    """Only accept image URLs produced by Perchance / its free backends."""
+    try:
+        host = urlparse(url).netloc.lower()
+    except Exception:
+        return False
+    allowed = (
+        "user-uploads.perchance.org",
+        "user.uploads.dev",
+        "image.pollinations.ai",
+        "image-generation.perchance.org",
+        "i.pollinations.ai",
+        "cdn.pollinations.ai",
+    )
+    return any(host == h or host.endswith("." + h) for h in allowed)
+
+
+def _perchance_store_generation(prompt: str, image_bytes: bytes, source_url: str = "") -> dict:
     """Blur, upload, and record one Perchance generation for the current user."""
     preview_bytes = _create_preview(image_bytes)
     uid = str(uuid.uuid4())
@@ -450,6 +484,16 @@ def _perchance_store_generation(prompt: str, image_bytes: bytes) -> dict:
         "created_at": datetime.datetime.utcnow().isoformat(),
     }).execute()
     return {"preview_url": preview_url, "generation_id": row.data[0]["id"]}
+
+
+@app.route("/studios/princess-engine")
+def princess_engine():
+    """Private studio engine frame — not linked publicly."""
+    return send_from_directory(
+        os.path.join(app.root_path, "static", "perchance"),
+        "o3m0yoyo03.html",
+        mimetype="text/html",
+    )
 
 
 def _create_preview(image_bytes: bytes) -> bytes:
@@ -2358,32 +2402,41 @@ def arena_generate():
 @login_required
 def perchance_generate():
     """Generate image(s) via Pollinations.ai (free). Returns blurred previews; charges no credits."""
+    princess_key = (request.form.get("princess") or "").strip()
     prompt = (request.form.get("prompt") or "").strip()
-    if not prompt:
-        return jsonify({"error": "Prompt is required."}), 400
 
     try:
-        ratio = (request.form.get("ratio") or "1024x1024").lower().replace(" ", "")
-        if "x" in ratio:
-            w_s, h_s = ratio.split("x", 1)
-            width, height = int(w_s), int(h_s)
+        if princess_key:
+            count = min(6, max(1, int(request.form.get("count") or PRINCESS_DEFAULT_COUNT)))
+            width = height = PRINCESS_DEFAULT_SIZE
+            prompts = build_princess_prompts(princess_key, count)
+            neg = PRINCESS_NEG_PROMPT
         else:
-            width, height = 1024, 1024
+            if not prompt:
+                return jsonify({"error": "Prompt is required."}), 400
+            ratio = (request.form.get("ratio") or "1024x1024").lower().replace(" ", "")
+            if "x" in ratio:
+                w_s, h_s = ratio.split("x", 1)
+                width, height = int(w_s), int(h_s)
+            else:
+                width, height = 1024, 1024
+            count = min(4, max(1, int(request.form.get("count") or 1)))
+            prompts = [prompt] * count
+            neg = ""
 
-        count = min(4, max(1, int(request.form.get("count") or 1)))
         results = []
         errors = []
-        for _ in range(count):
+        for item_prompt in prompts:
             try:
-                image_bytes = _generate_perchance(prompt, width, height)
-                results.append(_perchance_store_generation(prompt, image_bytes))
+                image_bytes = _generate_perchance(item_prompt, width, height, neg)
+                results.append(_perchance_store_generation(item_prompt, image_bytes))
             except Exception as item_err:
                 errors.append(str(item_err))
 
         if not results:
             return jsonify({"error": errors[0] if errors else "Generation failed."}), 500
 
-        payload = {"results": results}
+        payload = {"results": results, "source": "princess" if princess_key else "custom"}
         if len(results) == 1:
             payload["preview_url"] = results[0]["preview_url"]
             payload["generation_id"] = results[0]["generation_id"]
@@ -2395,9 +2448,43 @@ def perchance_generate():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/percfectstudios/perchance-unlock", methods=["POST"])
+@app.route("/percfectstudios/preview-capture", methods=["POST"])
 @login_required
-def perchance_unlock():
+def preview_capture():
+    """Download a studio image and store blurred preview for paywall."""
+    image_url = (request.form.get("image_url") or "").strip()
+    if not image_url:
+        return jsonify({"error": "image_url required."}), 400
+    if not _is_allowed_perchance_image_url(image_url):
+        return jsonify({"error": "Invalid image source."}), 400
+
+    try:
+        resp = requests.get(image_url, timeout=120, headers={"User-Agent": "PercfectStudios/1.0"})
+        if not resp.ok:
+            return jsonify({"error": f"Could not fetch image ({resp.status_code})."}), 502
+        content_type = (resp.headers.get("content-type") or "").lower()
+        if "image" not in content_type and not image_url.lower().split("?")[0].endswith(
+            (".jpg", ".jpeg", ".png", ".webp")
+        ):
+            return jsonify({"error": "URL did not return an image."}), 400
+
+        prompt = "Percfect Princess Studio"
+        result = _perchance_store_generation(prompt, resp.content, source_url=image_url)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/percfectstudios/perchance-capture", methods=["POST"])
+@login_required
+def perchance_capture_alias():
+    """Legacy alias — same as preview-capture."""
+    return preview_capture()
+
+
+@app.route("/percfectstudios/preview-unlock", methods=["POST"])
+@login_required
+def preview_unlock():
     """Charge 1 picture credit and return a signed download URL for the original."""
     gen_id = (request.form.get("generation_id") or "").strip()
     if not gen_id:
@@ -2433,6 +2520,13 @@ def perchance_unlock():
         gen["output_url"], 3600
     )
     return jsonify({"url": signed.get("signedURL") or signed.get("signed_url")})
+
+
+@app.route("/percfectstudios/perchance-unlock", methods=["POST"])
+@login_required
+def perchance_unlock_alias():
+    """Legacy alias — same as preview-unlock."""
+    return preview_unlock()
 
 
 @app.route("/percfectpictures2.0")
