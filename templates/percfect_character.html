@@ -75,10 +75,10 @@
         <input class="form-control" id="char-name" placeholder="e.g. Sir Galahad" maxlength="80" />
 
         <div class="review-row">
-          <button class="btn-accent" style="flex:1" onclick="approveOne()">✓ Approve &amp; build full set + 360°</button>
+          <button class="btn-accent" style="flex:1" onclick="approveOne()">✓ Approve &amp; build all 4 shots</button>
           <button class="btn-outline-accent" onclick="generateOne()">↻ Regenerate</button>
         </div>
-        <p class="credit-note">approving uses 3 image credits + 6 video seconds</p>
+        <p class="credit-note">builds the other 3 shots (3 image credits) · the 360° spin comes after you approve all 4</p>
         <div id="review-err" class="gen-error" style="display:none"></div>
       </div>
 
@@ -96,17 +96,29 @@
         <div class="shots-grid" id="final-grid"></div>
         <p class="section-label" style="margin:1rem 0 .5rem">360° spin</p>
         <div class="output-area spin-out" id="final-spin-out" style="min-height:auto;">
-          <div class="output-placeholder" id="final-spin-ph"><p class="ph-text">360° will appear here</p></div>
+          <div class="output-placeholder" id="final-spin-ph"><p class="ph-text">Approve below to create your 360° spin</p></div>
           <video id="final-spin" controls loop muted playsinline style="display:none"></video>
         </div>
 
-        <!-- Looks good? -->
+        <!-- Approval gate: yes → 360° spin, no → edit prompt & redo -->
         <div id="approval-row" class="mt-3" style="text-align:center">
-          <p style="font-weight:600;margin-bottom:.5rem;">Looks good?</p>
+          <p style="font-weight:600;margin-bottom:.5rem;">Happy with all 4 shots?</p>
           <div style="display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap">
-            <button class="btn-accent" onclick="saveAndDone()">✓ Yes, save and done</button>
-            <button class="btn-outline-accent" onclick="showRefine()">✕ Fix one of the photos</button>
+            <button class="btn-accent" onclick="approveSpin()">✓ Yes — create the 360° spin</button>
+            <button class="btn-outline-accent" onclick="showEditPrompt()">✏️ No — edit prompt &amp; redo</button>
+            <button class="btn-outline-accent" onclick="showRefine()">✕ Fix one photo</button>
           </div>
+        </div>
+
+        <!-- Not approved → edit the prompt and regenerate from scratch -->
+        <div id="editprompt-section" style="display:none" class="mt-3">
+          <label class="form-label">Edit your prompt and regenerate</label>
+          <textarea class="form-control" id="editprompt-text" rows="3" placeholder="Describe your character…"></textarea>
+          <div class="review-row">
+            <button class="btn-accent" style="flex:1" onclick="redoFromPrompt()">↻ Regenerate from this prompt (1 image credit)</button>
+            <button class="btn-outline-accent" onclick="hide('editprompt-section')">Cancel</button>
+          </div>
+          <div id="editprompt-err" class="gen-error" style="display:none"></div>
         </div>
 
         <!-- Refine -->
@@ -350,22 +362,53 @@ async function _approveOne(){
     loadRoster();
   }catch(e){ loudErr('fin-err','Network error — please try again.'); stopFinProgress(); return; }
 
-  // Phase 2 — 360 spin (separate request so we stay under the proxy timeout)
-  setFinLabel('Creating the 360° spin…');
-  try{
-    const fd2=new FormData(); fd2.append('character_id',state.savedId);
-    const res2=await fetch('/studios/percfectcharacter/generate-spin',{method:'POST',body:fd2});
-    let d2; try { d2 = await res2.json(); } catch(_e) { d2 = {}; }
-    if(res2.ok && d2.url){
-      const v=document.getElementById('final-spin'); v.src=d2.url; v.style.display='block';
-      document.getElementById('final-spin-ph').style.display='none';
-      v.play().catch(()=>{});
-      adjCredit('vid-credits',-6); loadRoster();
-    } else {
-      loudErr('fin-err',(d2.error||'The 360° spin failed — your character is saved; use the 🎥 360° button in your roster to retry.'));
-    }
-  }catch(e){ loudErr('fin-err','The 360° spin timed out — your character is saved; you can retry from your roster.'); }
-  finally{ stopFinProgress(); }
+  // Stop here: the 360° spin is now gated behind approval (approveSpin),
+  // and "no" opens the edit-prompt box instead.
+  stopFinProgress();
+}
+
+/* ── Approved → run the 360° spin ── */
+function approveSpin(){
+  if(!state.savedId){ return; }
+  hide('approval-row'); hide('editprompt-section'); hide('refine-section');
+  const ph=document.getElementById('final-spin-ph');
+  ph.style.display=''; ph.querySelector('.ph-text').textContent='360° will appear here';
+  const v=document.getElementById('final-spin'); v.style.display='none'; v.removeAttribute('src');
+  startFinProgress('Creating the 360° spin…');
+  (async()=>{
+    try{
+      const fd2=new FormData(); fd2.append('character_id',state.savedId);
+      const res2=await fetch('/studios/percfectcharacter/generate-spin',{method:'POST',body:fd2});
+      let d2; try { d2 = await res2.json(); } catch(_e) { d2 = {}; }
+      if(res2.ok && d2.url){
+        v.src=d2.url; v.style.display='block'; ph.style.display='none';
+        v.play().catch(()=>{});
+        adjCredit('vid-credits',-6); loadRoster();
+      } else {
+        loudErr('fin-err',(d2.error||'The 360° spin failed — your character is saved; use the 🎥 360° button in your roster to retry.'));
+        show('approval-row');
+      }
+    }catch(e){ loudErr('fin-err','The 360° spin timed out — your character is saved; you can retry from your roster.'); show('approval-row'); }
+    finally{ stopFinProgress(); }
+  })();
+}
+
+/* ── Not approved → edit the last prompt and regenerate from the front shot ── */
+function showEditPrompt(){
+  hide('refine-section');
+  const last = document.getElementById('desc').value.trim() || state.prompt || '';
+  document.getElementById('editprompt-text').value = last;
+  hide('editprompt-err');
+  show('editprompt-section');
+  document.getElementById('editprompt-section').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function redoFromPrompt(){
+  const txt = document.getElementById('editprompt-text').value.trim();
+  if(!txt){ loudErr('editprompt-err','Enter a prompt first.'); return; }
+  document.getElementById('desc').value = txt;
+  state.mode = 'describe';
+  hide('editprompt-section'); hide('approval-row'); hide('final-section');
+  _generateOne();   // back to the front shot → re-approve → rebuild
 }
 
 const POSE_LABELS = ['Front','Back','Left side','Right side'];
