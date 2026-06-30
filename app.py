@@ -22,6 +22,7 @@ from perchance_princess import (
     DEFAULT_SIZE as PRINCESS_DEFAULT_SIZE,
     NEG_PROMPT as PRINCESS_NEG_PROMPT,
     normalize_princess_key,
+    PRINCESS_KEYS,
     build_princess_prompts,
 )
 
@@ -2443,7 +2444,7 @@ def perchance_generate():
         def _download_prompt(item_prompt: str) -> tuple[str, bytes]:
             return item_prompt, _generate_perchance(item_prompt, width, height, neg)
 
-        workers = min(3, len(prompts))
+        workers = min(6, len(prompts))
         downloaded: list[tuple[str, bytes]] = []
         with ThreadPoolExecutor(max_workers=workers) as pool:
             futures = [pool.submit(_download_prompt, p) for p in prompts]
@@ -2576,7 +2577,11 @@ def percfect_pictures2():
             "id", current_user.id
         ).single().execute()
         user_data = res.data
-    return render_template("percfect_pictures2.html", user=user_data)
+    return render_template(
+        "percfect_pictures2.html",
+        user=user_data,
+        princess_keys=PRINCESS_KEYS,
+    )
 
 
 if __name__ == "__main__":

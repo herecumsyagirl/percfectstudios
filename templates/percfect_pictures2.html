@@ -46,6 +46,21 @@
     font-size: 0.85rem; font-weight: 700;
   }
   .pp2-credits { font-size: 0.75rem; color: var(--accent); font-weight: 700; }
+  .pp2-controls {
+    display: flex; flex-direction: column; gap: 0.5rem;
+    padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-2);
+  }
+  .pp2-select {
+    width: 100%; padding: 0.55rem 0.65rem; border-radius: 10px;
+    border: 1px solid var(--border-2); background: var(--bg-3);
+    color: var(--text); font-size: 0.85rem;
+  }
+  .pp2-generate-btn {
+    width: 100%; padding: 0.65rem 1rem; border: none; border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff; font-size: 0.85rem; font-weight: 800; cursor: pointer;
+  }
+  .pp2-generate-btn:disabled { opacity: 0.55; cursor: wait; }
   .pp2-paywall-scroll { overflow-y: auto; padding: 0.75rem; flex: 1; }
 
   .pp2-grid { display: flex; flex-direction: column; gap: 0.75rem; }
@@ -77,7 +92,7 @@
     color: #f87171; border-radius: 10px; padding: 0.5rem 0.75rem;
     margin: 0.75rem 0; font-size: 0.8rem; display: none;
   }
-  .pp2-capturing {
+  .pp2-status {
     font-size: 0.75rem; color: var(--text-muted); padding: 0.5rem 1rem;
     border-top: 1px solid var(--border-2); display: none;
   }
@@ -94,7 +109,7 @@
 <div class="pp2-wrap">
   <div class="pp2-hero">
     <h1>👑 Perfect Princess Generator</h1>
-    <p>Choose your princess, hit Generate — previews appear blurred. Unlock full quality with credits.</p>
+    <p>Pick a princess, hit Generate — 6 blurred previews appear free. Unlock full quality with 1 credit each.</p>
   </div>
 
   <div class="pp2-error" id="pp2-error"></div>
@@ -121,14 +136,30 @@
         </span>
         {% endif %}
       </div>
+
+      <div class="pp2-controls">
+        <select id="pp2-princess" class="pp2-select">
+          {% for name in princess_keys %}
+          <option value="{{ name }}"{% if name == 'Jasmine' %} selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+        <button id="pp2-generate-btn" class="pp2-generate-btn" type="button">
+          ✨ Generate 6 Previews
+        </button>
+      </div>
+
       <div class="pp2-paywall-scroll">
         <div class="pp2-grid" id="pp2-grid">
           <div class="pp2-empty" id="pp2-empty">
-            Your generated previews will show up here
+            {% if current_user.is_authenticated %}
+            Choose a princess above and tap Generate
+            {% else %}
+            <a href="/login?next=/percfectpictures2.0">Log in</a> to generate previews
+            {% endif %}
           </div>
         </div>
       </div>
-      <div class="pp2-capturing" id="pp2-capturing">⏳ Saving preview…</div>
+      <div class="pp2-status" id="pp2-status"></div>
     </div>
   </div>
 
@@ -143,8 +174,8 @@
 </div>
 
 <script>
-  const pp2Seen = new Set();
-  const pp2Pending = new Set();
+  const pp2LoggedIn = {{ 'true' if current_user.is_authenticated else 'false' }};
+  let pp2Busy = false;
 
   function pp2ShowError(msg) {
     const el = document.getElementById('pp2-error');
@@ -153,30 +184,15 @@
   }
   function pp2HideError() { document.getElementById('pp2-error').style.display = 'none'; }
 
+  function pp2SetStatus(on, text) {
+    const el = document.getElementById('pp2-status');
+    el.style.display = on ? 'block' : 'none';
+    if (text) el.textContent = text;
+  }
+
   function pp2ClearEmpty() {
     const empty = document.getElementById('pp2-empty');
     if (empty) empty.remove();
-  }
-
-  function pp2RenderPreview(previewUrl, genId) {
-    pp2ClearEmpty();
-    const grid = document.getElementById('pp2-grid');
-    const card = document.createElement('div');
-    card.className = 'pp2-card';
-    card.dataset.genId = genId;
-    card.innerHTML = `
-      <img src="${previewUrl}" alt="Preview">
-      <div class="pp2-unlock-overlay">
-        <button class="pp2-unlock-btn" onclick="pp2Unlock('${genId}', this)">🔓 Unlock — 1 Credit</button>
-        <span class="pp2-unlock-label">Full quality · PERCFECT™</span>
-      </div>`;
-    grid.prepend(card);
-  }
-
-  function pp2SetCapturing(on, text) {
-    const cap = document.getElementById('pp2-capturing');
-    cap.style.display = on ? 'block' : 'none';
-    if (text) cap.textContent = text;
   }
 
   function pp2ShowSkeletons(n) {
@@ -194,158 +210,112 @@
     document.querySelectorAll('.pp2-skeleton').forEach(el => el.remove());
   }
 
+  function pp2RenderPreview(previewUrl, genId) {
+    pp2ClearEmpty();
+    pp2RemoveSkeletons();
+    const grid = document.getElementById('pp2-grid');
+    const card = document.createElement('div');
+    card.className = 'pp2-card';
+    card.dataset.genId = genId;
+    card.innerHTML = `
+      <img src="${previewUrl}" alt="Preview" loading="lazy">
+      <div class="pp2-unlock-overlay">
+        <button class="pp2-unlock-btn" onclick="pp2Unlock('${genId}', this)">🔓 Unlock — 1 Credit</button>
+        <span class="pp2-unlock-label">Full quality · PERCFECT™</span>
+      </div>`;
+    grid.prepend(card);
+  }
+
   async function pp2ParseJson(res) {
     const ct = (res.headers.get('content-type') || '').toLowerCase();
-    if (ct.includes('application/json')) {
-      return res.json();
-    }
-    if (res.status === 401 || res.status === 302) {
-      throw new Error('LOG_IN');
-    }
+    if (ct.includes('application/json')) return res.json();
     const text = await res.text();
-    if (text.includes('Redirecting') || text.includes('/login')) {
-      throw new Error('LOG_IN');
-    }
+    if (res.status === 401 || text.includes('/login')) throw new Error('LOG_IN');
     throw new Error(`Server error (${res.status})`);
   }
 
-  async function pp2PostGenerate(princess, count) {
-    const fd = new FormData();
-    fd.append('princess', princess);
-    fd.append('count', String(count));
-    const res = await fetch('/percfectstudios/perchance-generate', {
-      method: 'POST',
-      body: fd,
-      credentials: 'same-origin',
-    });
-    const data = await pp2ParseJson(res);
-    if (!res.ok || data.error) {
-      throw new Error(data.error || 'Generation failed.');
+  async function pp2BackendGenerate(princess) {
+    if (!pp2LoggedIn) {
+      pp2ShowError('Log in to generate. <a href="/login?next=/percfectpictures2.0" style="color:#c4b5fd">Log in →</a>');
+      return;
     }
-    return data;
-  }
+    if (pp2Busy) return;
+    pp2Busy = true;
 
-  async function pp2Capture(imageUrl, imageData) {
-    {% if not current_user.is_authenticated %}
-    pp2ShowError('Log in to save previews. <a href="/login?next=/percfectpictures2.0" style="color:#c4b5fd">Log in →</a>');
-    return;
-    {% endif %}
-
-    const key = imageUrl || imageData;
-    if (pp2Seen.has(key) || pp2Pending.has(key)) return;
-    pp2Pending.add(key);
-    pp2SetCapturing(true, '⏳ Saving preview…');
+    const btn = document.getElementById('pp2-generate-btn');
+    btn.disabled = true;
+    pp2HideError();
+    pp2ShowSkeletons(6);
+    pp2SetStatus(true, '⏳ Generating 6 previews… (~1–2 min)');
 
     try {
       const fd = new FormData();
-      if (imageData) fd.append('image_data', imageData);
-      else fd.append('image_url', imageUrl);
+      fd.append('princess', princess || document.getElementById('pp2-princess').value || 'Jasmine');
+      fd.append('count', '6');
 
-      const res = await fetch('/percfectstudios/preview-capture', {
-        method: 'POST', body: fd, credentials: 'same-origin',
+      const res = await fetch('/percfectstudios/perchance-generate', {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin',
       });
       const data = await pp2ParseJson(res);
 
       if (!res.ok || data.error) {
-        pp2ShowError(data.error || 'Could not save preview.');
-        return;
+        throw new Error(data.error || 'Generation failed.');
       }
 
-      pp2Seen.add(key);
-      pp2RenderPreview(data.preview_url, data.generation_id);
-      pp2HideError();
+      pp2RemoveSkeletons();
+      const items = data.results || [];
+      if (!items.length && data.preview_url) {
+        items.push({ preview_url: data.preview_url, generation_id: data.generation_id });
+      }
+
+      items.forEach(item => {
+        if (item.preview_url && item.generation_id) {
+          pp2RenderPreview(item.preview_url, item.generation_id);
+        }
+      });
+
+      if (!items.length) throw new Error('No previews returned.');
+
+      if (data.partial_errors && data.partial_errors.length) {
+        pp2ShowError(`Got ${items.length}/6 previews. Tap Generate again for more.`);
+      } else {
+        pp2HideError();
+        pp2SetStatus(true, `✅ ${items.length} previews ready`);
+      }
     } catch (e) {
+      pp2RemoveSkeletons();
       if (e.message === 'LOG_IN') {
         pp2ShowError('Session expired. <a href="/login?next=/percfectpictures2.0" style="color:#c4b5fd">Log in →</a>');
       } else {
-        pp2ShowError(e.message || 'Network error — try again.');
+        pp2ShowError(e.message || 'Generation failed — try again.');
       }
+      pp2SetStatus(false);
     } finally {
-      pp2Pending.delete(key);
-      if (!pp2Pending.size) pp2SetCapturing(false);
+      pp2Busy = false;
+      btn.disabled = false;
     }
   }
 
-  async function pp2BackendGenerate(princess) {
-    {% if not current_user.is_authenticated %}
-    pp2ShowError('Log in to save previews. <a href="/login?next=/percfectpictures2.0" style="color:#c4b5fd">Log in →</a>');
-    return;
-    {% endif %}
-
-    pp2HideError();
-    pp2ShowSkeletons(6);
-    pp2SetCapturing(true, '⏳ Generating previews… (0/6)');
-
-    const princessKey = princess || 'Jasmine';
-    let done = 0;
-    let saved = 0;
-    const batchErrors = [];
-
-    const tasks = Array.from({ length: 6 }, () => (async () => {
-      try {
-        const data = await pp2PostGenerate(princessKey, 1);
-        const items = data.results || [{ preview_url: data.preview_url, generation_id: data.generation_id }];
-        for (const item of items) {
-          if (item.preview_url && item.generation_id) {
-            pp2RenderPreview(item.preview_url, item.generation_id);
-            saved++;
-          }
-        }
-        if (data.partial_errors && data.partial_errors.length) {
-          batchErrors.push(...data.partial_errors);
-        }
-      } catch (e) {
-        batchErrors.push(e.message || 'Generation failed.');
-      } finally {
-        done++;
-        pp2SetCapturing(true, `⏳ Generating previews… (${done}/6)`);
-      }
-    })());
-
-    await Promise.allSettled(tasks);
-    pp2RemoveSkeletons();
-    pp2SetCapturing(false);
-
-    if (!saved) {
-      if (batchErrors.some(m => m === 'LOG_IN' || (m && m.includes('Log in')))) {
-        pp2ShowError('Session expired. <a href="/login?next=/percfectpictures2.0" style="color:#c4b5fd">Log in →</a>');
-      } else {
-        pp2ShowError(batchErrors[0] || 'Generation failed — try again.');
-      }
-      return;
-    }
-
-    if (batchErrors.length) {
-      pp2ShowError(`Saved ${saved}/6 previews. Some images failed — try Generate again.`);
-    } else {
-      pp2HideError();
-    }
-  }
+  document.getElementById('pp2-generate-btn').addEventListener('click', function () {
+    pp2BackendGenerate(document.getElementById('pp2-princess').value);
+  });
 
   window.addEventListener('message', function (e) {
     if (!e.data) return;
-    if (e.data.type === 'percfect-studio-image' && e.data.url) {
-      pp2Capture(e.data.url);
-    }
-    if (e.data.type === 'percfect-studio-blob' && e.data.data) {
-      pp2Capture(null, e.data.data);
-    }
     if (e.data.type === 'percfect-studio-generate' && e.data.princess) {
+      const sel = document.getElementById('pp2-princess');
+      if (sel && e.data.princess) sel.value = e.data.princess;
       pp2BackendGenerate(e.data.princess);
-      const iframe = document.getElementById('pp2-studio');
-      if (iframe && iframe.contentWindow) {
-        [5000, 12000, 25000, 50000].forEach(ms => {
-          setTimeout(() => iframe.contentWindow.postMessage({ type: 'percfect-force-scan' }, '*'), ms);
-        });
-      }
     }
   });
 
   async function pp2Unlock(genId, btn) {
-    {% if not current_user.is_authenticated %}
-    window.location.href = '/login?next=/percfectpictures2.0';
-    return;
-    {% endif %}
+    if (!pp2LoggedIn) {
+      window.location.href = '/login?next=/percfectpictures2.0';
+      return;
+    }
 
     if (btn) { btn.disabled = true; btn.textContent = '…'; }
     pp2HideError();
@@ -384,7 +354,7 @@
       if (e.message === 'LOG_IN') {
         window.location.href = '/login?next=/percfectpictures2.0';
       } else {
-        pp2ShowError(e.message || 'Network error.');
+        pp2ShowError(e.message || 'Unlock failed.');
       }
       if (btn) { btn.disabled = false; btn.textContent = '🔓 Unlock — 1 Credit'; }
     }
