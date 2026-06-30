@@ -2744,5 +2744,98 @@ def percfect_pictures2():
     )
 
 
+# ── Community chatroom ────────────────────────────────────
+@app.route("/studios/chatroom")
+def chatroom():
+    user_data = None
+    if current_user.is_authenticated:
+        reset_daily_if_needed(current_user.id)
+        res = supabase.table("users").select("picture_credits,video_credits").eq("id", current_user.id).single().execute()
+        user_data = res.data
+    return render_template("chatroom.html", user=user_data)
+
+
+@app.route("/studios/chatroom/messages")
+def chatroom_messages():
+    """Poll endpoint. ?after=<id> returns only newer messages."""
+    try:
+        res = supabase.table("chat_messages").select(
+            "id,username,body,type,media_url,created_at"
+        ).order("id", desc=True).limit(60).execute()
+        msgs = list(reversed(res.data or []))
+        after = request.args.get("after")
+        if after:
+            try:
+                aid = int(after)
+                msgs = [m for m in msgs if m["id"] > aid]
+            except ValueError:
+                pass
+        return jsonify(msgs)
+    except Exception:
+        return jsonify([])
+
+
+@app.route("/studios/chatroom/send", methods=["POST"])
+@login_required
+def chatroom_send():
+    body = (request.form.get("body", "") or "").strip()[:500]
+    if not body:
+        return jsonify({"error": "Empty message."}), 400
+    try:
+        row = supabase.table("chat_messages").insert({
+            "user_id": current_user.id, "username": current_user.username,
+            "body": body, "type": "text",
+        }).execute()
+        return jsonify(row.data[0])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/studios/chatroom/fight", methods=["POST"])
+@login_required
+def chatroom_fight():
+    """Generate a fight clip between 2 of the user's characters and post it to the room."""
+    reset_daily_if_needed(current_user.id)
+    res = supabase.table("users").select("video_credits,videos_today").eq("id", current_user.id).single().execute()
+    u = res.data
+
+    ids = [i.strip() for i in request.form.get("character_ids", "").split(",") if i.strip()]
+    if len(ids) != 2:
+        return jsonify({"error": "Pick exactly 2 characters to fight."}), 400
+
+    duration = 6
+    if not current_user.is_admin and u["video_credits"] < duration:
+        return jsonify({"error": f"A fight needs {duration} video seconds — you have {u['video_credits']}. Buy credits or redeem a coupon code."}), 402
+
+    cres = supabase.table("characters").select("*").in_("id", ids).eq("user_id", current_user.id).execute()
+    rows = {str(c["id"]): c for c in (cres.data or [])}
+    primaries = [rows[i]["primary_image_url"] for i in ids if i in rows and rows[i].get("primary_image_url")]
+    names = [(rows[i].get("name") or "Character") for i in ids if i in rows]
+    if len(primaries) != 2:
+        return jsonify({"error": "Couldn't load both characters."}), 400
+
+    try:
+        composite = composite_characters(primaries)
+        result = generate_video_xai(character_action_prompt("fight"), composite, duration)
+        video_url = (result.get("video") or {}).get("url") or result.get("url") \
+            or (result.get("data") or [{}])[0].get("url")
+        if not video_url:
+            return jsonify({"error": "The fight video didn't generate. You were NOT charged."}), 502
+
+        if not current_user.is_admin:
+            supabase.table("users").update({
+                "video_credits": u["video_credits"] - duration,
+                "videos_today": u["videos_today"] + 1,
+            }).eq("id", current_user.id).execute()
+
+        row = supabase.table("chat_messages").insert({
+            "user_id": current_user.id, "username": current_user.username,
+            "body": f"⚔️ {names[0]} vs {names[1]}!", "type": "fight", "media_url": video_url,
+        }).execute()
+        return jsonify(row.data[0])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
