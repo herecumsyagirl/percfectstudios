@@ -2745,6 +2745,39 @@ def percfect_pictures2():
 
 
 # ── Community chatroom ────────────────────────────────────
+import re as _re
+
+CHAT_RATE_MAX = 5          # max messages per window
+CHAT_RATE_WINDOW = 10      # seconds
+CHAT_AUTO_HIDE_REPORTS = 3 # hide a message once this many distinct users report it
+_CHAT_URL_RE = _re.compile(r"(https?://|www\.)\S+", _re.IGNORECASE)
+# Minimal slur/garbage screen — extend as needed.
+CHAT_BANNED_WORDS = {"nigger", "faggot", "retard", "kike", "spic", "chink", "tranny"}
+
+
+def _chat_clean(body: str):
+    """Scrub links and screen banned words. Returns (clean_text, error)."""
+    text = (body or "").strip()[:500]
+    if not text:
+        return None, "Empty message."
+    low = text.lower()
+    if any(w in low for w in CHAT_BANNED_WORDS):
+        return None, "Your message was blocked for inappropriate language."
+    text = _CHAT_URL_RE.sub("[link removed]", text)
+    return text, None
+
+
+def _chat_rate_limited(user_id) -> bool:
+    try:
+        cutoff = (datetime.datetime.now(datetime.timezone.utc)
+                  - datetime.timedelta(seconds=CHAT_RATE_WINDOW)).isoformat()
+        res = supabase.table("chat_messages").select("id", count="exact").eq(
+            "user_id", user_id).gte("created_at", cutoff).execute()
+        return (res.count or 0) >= CHAT_RATE_MAX
+    except Exception:
+        return False
+
+
 @app.route("/studios/chatroom")
 def chatroom():
     user_data = None
@@ -2752,7 +2785,8 @@ def chatroom():
         reset_daily_if_needed(current_user.id)
         res = supabase.table("users").select("picture_credits,video_credits").eq("id", current_user.id).single().execute()
         user_data = res.data
-    return render_template("chatroom.html", user=user_data)
+    return render_template("chatroom.html", user=user_data,
+                           is_admin=bool(current_user.is_authenticated and current_user.is_admin))
 
 
 @app.route("/studios/chatroom/messages")
@@ -2761,7 +2795,7 @@ def chatroom_messages():
     try:
         res = supabase.table("chat_messages").select(
             "id,username,body,type,media_url,created_at"
-        ).order("id", desc=True).limit(60).execute()
+        ).eq("hidden", False).order("id", desc=True).limit(60).execute()
         msgs = list(reversed(res.data or []))
         after = request.args.get("after")
         if after:
@@ -2778,9 +2812,11 @@ def chatroom_messages():
 @app.route("/studios/chatroom/send", methods=["POST"])
 @login_required
 def chatroom_send():
-    body = (request.form.get("body", "") or "").strip()[:500]
-    if not body:
-        return jsonify({"error": "Empty message."}), 400
+    body, err = _chat_clean(request.form.get("body", ""))
+    if err:
+        return jsonify({"error": err}), 400
+    if not current_user.is_admin and _chat_rate_limited(current_user.id):
+        return jsonify({"error": "You're sending messages too fast — slow down a moment."}), 429
     try:
         row = supabase.table("chat_messages").insert({
             "user_id": current_user.id, "username": current_user.username,
@@ -2835,6 +2871,46 @@ def chatroom_fight():
         return jsonify(row.data[0])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/studios/chatroom/report", methods=["POST"])
+@login_required
+def chatroom_report():
+    try:
+        mid = int(request.form.get("message_id", "0"))
+    except ValueError:
+        return jsonify({"error": "Bad message."}), 400
+    if mid <= 0:
+        return jsonify({"error": "Bad message."}), 400
+    try:
+        # One report per user per message (unique constraint).
+        try:
+            supabase.table("chat_reports").insert(
+                {"message_id": mid, "reporter_user_id": current_user.id}).execute()
+        except Exception:
+            return jsonify({"ok": True, "already": True})  # already reported by this user
+
+        cnt = supabase.table("chat_reports").select("id", count="exact").eq("message_id", mid).execute().count or 0
+        update = {"report_count": cnt}
+        if cnt >= CHAT_AUTO_HIDE_REPORTS:
+            update["hidden"] = True
+        supabase.table("chat_messages").update(update).eq("id", mid).execute()
+        return jsonify({"ok": True, "hidden": cnt >= CHAT_AUTO_HIDE_REPORTS})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/studios/chatroom/delete", methods=["POST"])
+@login_required
+def chatroom_delete():
+    if not current_user.is_admin:
+        return jsonify({"error": "Admins only."}), 403
+    try:
+        mid = int(request.form.get("message_id", "0"))
+    except ValueError:
+        return jsonify({"error": "Bad message."}), 400
+    supabase.table("chat_messages").update({"hidden": True}).eq("id", mid).execute()
+    return jsonify({"ok": True})
 
 
 if __name__ == "__main__":

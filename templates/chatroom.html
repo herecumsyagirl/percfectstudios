@@ -35,6 +35,8 @@
   .cr-pick.sel { border-color:var(--accent); }
   .cr-pick .num { position:absolute; top:3px; left:3px; background:var(--accent); color:#fff; font-size:.65rem; font-weight:700; border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; }
   .cr-err { color:#f87171; font-size:.8rem; margin-top:.4rem; display:none; }
+  .cr-act { background:none; border:none; cursor:pointer; font-size:.7rem; opacity:.45; padding:0 .2rem; }
+  .cr-act:hover { opacity:1; }
 </style>
 
 <div class="cr-wrap">
@@ -61,6 +63,7 @@
 
 <script>
 const LOGGED_IN = {{ 'true' if user else 'false' }};
+const IS_ADMIN = {{ 'true' if is_admin else 'false' }};
 let lastId = 0, pickSel = [], rosterCache = [];
 
 function esc(s){ return (s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
@@ -72,9 +75,11 @@ function renderMsgs(msgs){
   const atBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 80;
   msgs.forEach(m=>{
     if(m.id<=lastId) return; lastId = m.id;
-    const div = document.createElement('div'); div.className = 'cr-msg';
+    const div = document.createElement('div'); div.className = 'cr-msg'; div.id = 'cr-m-'+m.id;
     const media = (m.type==='fight' && m.media_url) ? `<video src="${esc(m.media_url)}" controls loop muted playsinline></video>` : '';
-    div.innerHTML = `<div class="cr-meta">${esc(m.username||'anon')}</div>
+    const acts = (LOGGED_IN ? `<button class="cr-act" id="cr-rep-${m.id}" onclick="reportMsg(${m.id})" title="Report">⚐</button>` : '')
+      + (IS_ADMIN ? `<button class="cr-act" onclick="deleteMsg(${m.id})" title="Delete (admin)">🗑</button>` : '');
+    div.innerHTML = `<div class="cr-meta">${esc(m.username||'anon')} ${acts}</div>
       <div class="cr-bubble ${m.type==='fight'?'fight':''}">${esc(m.body||'')}${media}</div>`;
     feed.appendChild(div);
   });
@@ -147,6 +152,25 @@ async function postFight(){
     const vc=document.getElementById('vid-credits'); if(vc){ const n=parseInt(vc.textContent); if(!isNaN(n)) vc.textContent=Math.max(0,n-6); }
   }catch(e){ err.textContent='Network error — please try again.'; err.style.display='block'; }
   finally{ btn.disabled=false; btn.textContent='⚔️ Generate & post fight'; }
+}
+
+async function reportMsg(id){
+  const b=document.getElementById('cr-rep-'+id);
+  if(b){ b.disabled=true; b.textContent='⚐ reported'; }
+  try{
+    const fd=new FormData(); fd.append('message_id',id);
+    const res=await fetch('/studios/chatroom/report',{method:'POST',body:fd});
+    const d=await res.json();
+    if(d.hidden){ const el=document.getElementById('cr-m-'+id); if(el) el.remove(); }
+  }catch(e){}
+}
+async function deleteMsg(id){
+  if(!confirm('Delete this message?')) return;
+  try{
+    const fd=new FormData(); fd.append('message_id',id);
+    await fetch('/studios/chatroom/delete',{method:'POST',body:fd});
+    const el=document.getElementById('cr-m-'+id); if(el) el.remove();
+  }catch(e){}
 }
 
 poll();
